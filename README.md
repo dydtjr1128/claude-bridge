@@ -27,10 +27,16 @@ claude -p "Respond with exactly: OK" --model claude-sonnet-5 --no-session-persis
 
 ## Install
 
-Install or register this folder as a local Codex plugin using your normal Codex local-plugin flow. The plugin manifest is:
+Register this folder through a local Codex marketplace. The plugin manifest is:
 
 ```text
 .codex-plugin/plugin.json
+```
+
+For the default personal marketplace on Windows, keep the plugin source reachable from `C:\Users\<you>\plugins\claude-bridge` and add a marketplace entry named `claude-bridge` that points to `./plugins/claude-bridge`. Then install it with:
+
+```powershell
+codex plugin add claude-bridge@personal
 ```
 
 After installation, Codex should expose these skills:
@@ -122,7 +128,7 @@ If you do not explicitly ask for a fix, `$rescue` should keep Claude in investig
 Claude Bridge normalizes common shorthand before calling Claude CLI:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
-- `opus4.8` or `opus 4.8` -> `claude-opus-4-8`
+- `opus4.8`, `opus-4-8`, or `opus 4.8` -> `claude-opus-4-8`
 
 Default model policy:
 

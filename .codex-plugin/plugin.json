@@ -1,11 +1,20 @@
 {
   "name": "claude-bridge",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Bridge from Codex and other agents to Claude CLI for review, adversarial review, and rescue passes.",
   "author": {
     "name": "Local developer",
-    "email": "dydtjr1128@gmail.com"
+    "email": "dydtjr1128@gmail.com",
+    "url": "https://github.com/dydtjr1128"
   },
+  "homepage": "https://github.com/dydtjr1128/claude-bridge",
+  "repository": "https://github.com/dydtjr1128/claude-bridge.git",
+  "keywords": [
+    "claude",
+    "review",
+    "external-review",
+    "codex"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Claude Bridge",

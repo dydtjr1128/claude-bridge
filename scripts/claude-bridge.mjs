@@ -66,6 +66,7 @@ function normalizeModel(model, command, deep) {
       normalized === "opus" ||
       normalized === "opus4.8" ||
       normalized === "opus-4.8" ||
+      normalized === "opus-4-8" ||
       normalized === "opus 4.8" ||
       normalized === "opsu4.8"
     ) {
@@ -120,6 +121,20 @@ function run(command, args, options = {}) {
   });
 }
 
+function outputText(value) {
+  return typeof value === "string" ? value : "";
+}
+
+function commandReport(result) {
+  const spawnError = result.error instanceof Error ? result.error.message : "";
+  const stderr = [outputText(result.stderr).trim(), spawnError].filter(Boolean).join("\n");
+  return {
+    status: result.status,
+    stdout: outputText(result.stdout).trim(),
+    stderr
+  };
+}
+
 function readJsonResult(raw) {
   if (!raw.trim()) {
     return { result: "", parsed: null, parseError: "Claude produced no JSON output." };
@@ -163,18 +178,12 @@ function handleSetup(options) {
     "claude-sonnet-5",
     "--no-session-persistence"
   ], { cwd });
+  const versionReport = commandReport(version);
+  const smokeReport = commandReport(smoke);
   const payload = {
-    ready: version.status === 0 && smoke.status === 0 && smoke.stdout.includes("OK"),
-    version: {
-      status: version.status,
-      stdout: version.stdout.trim(),
-      stderr: version.stderr.trim()
-    },
-    smoke: {
-      status: smoke.status,
-      stdout: smoke.stdout.trim(),
-      stderr: smoke.stderr.trim()
-    }
+    ready: version.status === 0 && smoke.status === 0 && outputText(smoke.stdout).trim() === "OK",
+    version: versionReport,
+    smoke: smokeReport
   };
   printOutput({ ...payload, result: payload.ready ? "Claude Bridge setup check passed." : "Claude Bridge setup check failed." }, Boolean(options.json));
   if (!payload.ready) {
