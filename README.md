@@ -27,17 +27,70 @@ claude -p "Respond with exactly: OK" --model claude-sonnet-5 --no-session-persis
 
 ## Install
 
-Register this folder through a local Codex marketplace. The plugin manifest is:
+Clone the plugin into your personal Codex plugin folder:
 
-```text
-.codex-plugin/plugin.json
+```powershell
+mkdir $HOME\plugins -Force
+git clone https://github.com/dydtjr1128/claude-bridge.git $HOME\plugins\claude-bridge
 ```
 
-For the default personal marketplace on Windows, keep the plugin source reachable from `C:\Users\<you>\plugins\claude-bridge` and add a marketplace entry named `claude-bridge` that points to `./plugins/claude-bridge`. Then install it with:
+Add it to your personal Codex marketplace at `~/.agents/plugins/marketplace.json`. If you already have a personal marketplace file, add this object to its `plugins` array:
+
+```json
+{
+  "name": "claude-bridge",
+  "source": {
+    "source": "local",
+    "path": "./plugins/claude-bridge"
+  },
+  "policy": {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL"
+  },
+  "category": "Productivity"
+}
+```
+
+If you do not have a personal marketplace file yet, create one:
+
+```json
+{
+  "name": "personal",
+  "interface": {
+    "displayName": "Personal"
+  },
+  "plugins": [
+    {
+      "name": "claude-bridge",
+      "source": {
+        "source": "local",
+        "path": "./plugins/claude-bridge"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
+```
+
+Install the plugin:
 
 ```powershell
 codex plugin add claude-bridge@personal
 ```
+
+Then start a new Codex thread so the plugin skills are loaded.
+
+Run the setup check:
+
+```powershell
+node $HOME\plugins\claude-bridge\scripts\claude-bridge.mjs setup
+```
+
+The setup check verifies that the local Claude CLI is installed, authenticated enough for print mode, and able to answer with `OK`.
 
 After installation, Codex should expose these skills:
 
@@ -45,6 +98,12 @@ After installation, Codex should expose these skills:
 $review
 $adversarial-review
 $rescue
+```
+
+One simple first run is:
+
+```text
+Use $review to ask Claude to review my local changes.
 ```
 
 ## Usage
