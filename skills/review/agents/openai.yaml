@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Review"
+  short_description: "Ask Claude CLI for read-only review"
+  default_prompt: "Use $review to ask Claude for a read-only review of my local changes."

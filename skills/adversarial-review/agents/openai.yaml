@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Adversarial Review"
+  short_description: "Ask Claude to challenge a change"
+  default_prompt: "Use $adversarial-review to ask Claude to challenge this implementation."
