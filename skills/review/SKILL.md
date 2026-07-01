@@ -40,29 +40,25 @@ Return findings first, ordered by severity, with file/line references.
 If there are no actionable findings, say that clearly and mention residual test gaps.
 ```
 
-## Capture Pattern
+## Preferred Helper
 
-Capture raw output to files instead of dumping nested logs into chat:
+Prefer the bundled helper over hand-rolled Claude CLI calls. From a checked-out plugin source tree, run:
 
 ```powershell
-$prompt = @'
-You are an independent code reviewer.
-Scope: current git diff in this repository.
-Do not edit files.
-Do not run workflows, CI, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs you to run that exact command. A review request is not permission to run them.
-Use read-only inspection and lightweight local commands only when needed to ground findings.
-Prioritize correctness bugs, behavioral regressions, security risks, and missing tests.
-Return findings first, ordered by severity, with file/line references.
-If there are no actionable findings, say that clearly and mention residual test gaps.
-'@
-
-$out = Join-Path (Get-Location) ".codex\claude-bridge\run-$(Get-Date -Format yyyyMMdd-HHmmss)"
-New-Item -ItemType Directory -Force $out | Out-Null
-& claude -p $prompt --model claude-sonnet-5 --output-format json --no-session-persistence > (Join-Path $out "claude-review.json") 2> (Join-Path $out "claude-review.log")
+node .\scripts\claude-bridge.mjs review --scope "current git diff in this repository"
 ```
 
-Read the final answer from the JSON `result` field. Inspect logs only for failures.
+If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
+
+Useful options:
+
+- `--model claude-sonnet-5` for the default ordinary review model.
+- `--deep` to prefer `claude-opus-4-8` for high-risk review.
+- `--scope "<scope>"` to preserve the user's exact target.
+- `--dry-run` to inspect the generated prompt without calling Claude.
+
+The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.
 
 ## Result Handling
 
-Verify file and line claims locally. Discard unsupported findings even when they sound plausible. Do not count a failed Claude run as a completed review.
+Preserve Claude's findings, evidence boundaries, uncertainty notes, and file/line references. Verify claims locally before acting on them. Discard unsupported findings even when they sound plausible. Do not count a failed Claude run as a completed review. After presenting review findings, stop and ask the user which issues, if any, they want fixed before touching files.

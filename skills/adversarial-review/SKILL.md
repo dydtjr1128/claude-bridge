@@ -43,26 +43,16 @@ Start with Findings ordered by severity. If no actionable finding, say so clearl
 Then give a short structural verdict: solid parts, fragile parts, and top 3 improvements.
 ```
 
-## Capture Pattern
+## Preferred Helper
 
 ```powershell
-$prompt = @'
-You are an adversarial software reviewer.
-Scope: current git diff in this repository.
-Do not edit files.
-Do not run workflows, CI pipelines, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs you to run that exact command. An adversarial review request is not permission to run them.
-Use read-only inspection and lightweight local commands only when needed to ground findings.
-Try to find the strongest reasons this should not ship yet.
-Prioritize data loss, corruption, migrations, schema drift, concurrency, rollback, idempotency, trust boundaries, stale state, and missing tests.
-Report only material findings grounded in files, line numbers, or command output.
-Return in Korean.
-Start with Findings ordered by severity. If no actionable finding, say so clearly.
-Then give a short structural verdict: solid parts, fragile parts, and top 3 improvements.
-'@
-
-$out = Join-Path (Get-Location) ".codex\claude-bridge\run-$(Get-Date -Format yyyyMMdd-HHmmss)"
-New-Item -ItemType Directory -Force $out | Out-Null
-& claude -p $prompt --model claude-opus-4-8 --output-format json --no-session-persistence > (Join-Path $out "claude-adversarial-review.json") 2> (Join-Path $out "claude-adversarial-review.log")
+node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in this repository"
 ```
 
-Verify every claim locally before acting on it. Do not let Claude edit files during this review.
+If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
+
+Use `--deep` or `--model claude-opus-4-8` only when the scope is high-risk or the user explicitly wants Opus. Otherwise prefer Sonnet 5.
+
+The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.
+
+Verify every claim locally before acting on it. Preserve inference and uncertainty labels. Do not let Claude edit files during this review. After presenting findings, stop and ask the user which issues, if any, they want fixed before touching files.

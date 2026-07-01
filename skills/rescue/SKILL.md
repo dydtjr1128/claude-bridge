@@ -40,22 +40,14 @@ Return actionable findings, likely root cause, and the smallest safe next step.
 If proposing a fix, include files and line references.
 ```
 
-## Capture Pattern
+## Preferred Helper
 
 ```powershell
-$prompt = @'
-You are a rescue engineer giving Codex an external second opinion.
-Scope: <user request>
-Do not edit files unless the user explicitly requested a fix.
-Do not run workflows, CI, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs you to run that exact command. A rescue request is not permission to run them.
-Use read-only inspection and lightweight local commands when needed.
-Return actionable findings, likely root cause, and the smallest safe next step.
-If proposing a fix, include files and line references.
-'@
-
-$out = Join-Path (Get-Location) ".codex\claude-bridge\run-$(Get-Date -Format yyyyMMdd-HHmmss)"
-New-Item -ItemType Directory -Force $out | Out-Null
-& claude -p $prompt --model claude-sonnet-5 --output-format json --no-session-persistence > (Join-Path $out "claude-rescue.json") 2> (Join-Path $out "claude-rescue.log")
+node .\scripts\claude-bridge.mjs rescue --scope "<user request and relevant context>"
 ```
 
-Treat Claude output as advisory. Verify code claims, command claims, and proposed fixes locally.
+If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
+
+Use `--deep` or `--model claude-opus-4-8` only for difficult failures, security-sensitive issues, or repeated failed attempts.
+
+Treat Claude output as advisory. Preserve observed facts, inferences, open questions, and next steps. Verify code claims, command claims, and proposed fixes locally. If Claude was not successfully invoked, report the failure and do not invent a substitute rescue answer.

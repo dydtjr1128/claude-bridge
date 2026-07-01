@@ -43,6 +43,17 @@ $rescue
 
 ## Usage
 
+Claude Bridge includes a small companion script inspired by the helper-runtime pattern in `openai/codex-plugin-cc`.
+
+```powershell
+node .\scripts\claude-bridge.mjs setup
+node .\scripts\claude-bridge.mjs review --scope "current git diff in this repository"
+node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in this repository"
+node .\scripts\claude-bridge.mjs rescue --scope "the failing parser test"
+```
+
+The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent.
+
 ### `$review`
 
 Runs a normal read-only Claude review against the current scope.
@@ -133,7 +144,7 @@ A general review request is not permission to run CI, deploy, release, or trigge
 
 ## Output Handling
 
-The skills prefer capturing Claude output to files under:
+The helper captures Claude output to files under:
 
 ```text
 .codex/claude-bridge/
@@ -157,5 +168,10 @@ skills/
   review/
   adversarial-review/
   rescue/
+prompts/
+  review.md
+  adversarial-review.md
+  rescue.md
+scripts/
+  claude-bridge.mjs
 ```
-
