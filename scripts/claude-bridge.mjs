@@ -1,0 +1,280 @@
+#!/usr/bin/env node
+
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const PROMPT_DIR = path.join(ROOT_DIR, "prompts");
+const VALID_COMMANDS = new Set(["setup", "review", "adversarial-review", "rescue"]);
+
+function usage() {
+  console.log([
+    "Usage:",
+    "  node scripts/claude-bridge.mjs setup [--json]",
+    "  node scripts/claude-bridge.mjs review [--model <model>] [--language <lang>] [--scope <text>] [focus ...]",
+    "  node scripts/claude-bridge.mjs adversarial-review [--model <model>|--deep] [--language <lang>] [--scope <text>] [focus ...]",
+    "  node scripts/claude-bridge.mjs rescue [--model <model>|--deep] [--language <lang>] [--scope <text>] [request ...]",
+    "",
+    "Options:",
+    "  --cwd <path>          Run from this repository path.",
+    "  --output-dir <path>   Store Claude JSON, log, prompt, and markdown output here.",
+    "  --dry-run             Print the generated prompt without calling Claude.",
+    "  --json                Print machine-readable wrapper output.",
+    "  --deep                Prefer claude-opus-4-8 for high-risk/deep review."
+  ].join("\n"));
+}
+
+function parseArgs(argv) {
+  const options = {};
+  const positionals = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index];
+    if (!value.startsWith("--")) {
+      positionals.push(value);
+      continue;
+    }
+    const key = value.slice(2);
+    if (["json", "dry-run", "deep"].includes(key)) {
+      options[key] = true;
+      continue;
+    }
+    const next = argv[index + 1];
+    if (next == null || next.startsWith("--")) {
+      throw new Error(`Missing value for --${key}`);
+    }
+    options[key] = next;
+    index += 1;
+  }
+  return { options, positionals };
+}
+
+function normalizeModel(model, command, deep) {
+  if (model) {
+    const normalized = String(model).trim().toLowerCase();
+    if (
+      normalized === "sonnet" ||
+      normalized === "sonnet5" ||
+      normalized === "sonnet-5" ||
+      normalized === "sonnet 5"
+    ) {
+      return "claude-sonnet-5";
+    }
+    if (
+      normalized === "opus" ||
+      normalized === "opus4.8" ||
+      normalized === "opus-4.8" ||
+      normalized === "opus 4.8" ||
+      normalized === "opsu4.8"
+    ) {
+      return "claude-opus-4-8";
+    }
+    return model;
+  }
+  if (deep || command === "adversarial-review") {
+    return deep ? "claude-opus-4-8" : "claude-sonnet-5";
+  }
+  return "claude-sonnet-5";
+}
+
+function timestamp() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    "-",
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds())
+  ].join("");
+}
+
+function ensureDirectory(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+function loadPrompt(command) {
+  const file = path.join(PROMPT_DIR, `${command}.md`);
+  return fs.readFileSync(file, "utf8");
+}
+
+function renderPrompt(template, values) {
+  return template.replace(/\{\{([A-Z_]+)\}\}/g, (_, key) => values[key] ?? "");
+}
+
+function commandLabel(command) {
+  return command === "adversarial-review" ? "adversarial review" : command;
+}
+
+function run(command, args, options = {}) {
+  return spawnSync(command, args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    env: process.env,
+    windowsHide: true,
+    maxBuffer: 20 * 1024 * 1024
+  });
+}
+
+function readJsonResult(raw) {
+  if (!raw.trim()) {
+    return { result: "", parsed: null, parseError: "Claude produced no JSON output." };
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      result: typeof parsed.result === "string" ? parsed.result : "",
+      parsed,
+      parseError: null
+    };
+  } catch (error) {
+    return {
+      result: raw,
+      parsed: null,
+      parseError: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+function printOutput(payload, asJson) {
+  if (asJson) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+  if (payload.result) {
+    process.stdout.write(payload.result.endsWith("\n") ? payload.result : `${payload.result}\n`);
+  }
+  if (payload.outputDir) {
+    process.stdout.write(`\nClaude Bridge output: ${payload.outputDir}\n`);
+  }
+}
+
+function handleSetup(options) {
+  const cwd = path.resolve(options.cwd ?? process.cwd());
+  const version = run("claude", ["--version"], { cwd });
+  const smoke = run("claude", [
+    "-p",
+    "Respond with exactly: OK",
+    "--model",
+    "claude-sonnet-5",
+    "--no-session-persistence"
+  ], { cwd });
+  const payload = {
+    ready: version.status === 0 && smoke.status === 0 && smoke.stdout.includes("OK"),
+    version: {
+      status: version.status,
+      stdout: version.stdout.trim(),
+      stderr: version.stderr.trim()
+    },
+    smoke: {
+      status: smoke.status,
+      stdout: smoke.stdout.trim(),
+      stderr: smoke.stderr.trim()
+    }
+  };
+  printOutput({ ...payload, result: payload.ready ? "Claude Bridge setup check passed." : "Claude Bridge setup check failed." }, Boolean(options.json));
+  if (!payload.ready) {
+    process.exitCode = 1;
+  }
+}
+
+function handleClaudeCommand(command, options, positionals) {
+  const cwd = path.resolve(options.cwd ?? process.cwd());
+  const scope = options.scope ?? "current git diff in this repository";
+  const userFocus = positionals.join(" ").trim() || "No extra focus provided.";
+  const language = options.language ?? "Korean unless the user requested another language";
+  const model = normalizeModel(options.model, command, Boolean(options.deep));
+  const outputDir = path.resolve(
+    cwd,
+    options["output-dir"] ?? path.join(".codex", "claude-bridge", `run-${timestamp()}`)
+  );
+
+  const prompt = renderPrompt(loadPrompt(command), {
+    SCOPE: scope,
+    USER_FOCUS: userFocus,
+    LANGUAGE: language
+  });
+  const promptFile = path.join(outputDir, `${command}.prompt.md`);
+  const jsonFile = path.join(outputDir, `${command}.json`);
+  const logFile = path.join(outputDir, `${command}.log`);
+  const mdFile = path.join(outputDir, `${command}.md`);
+
+  if (options["dry-run"]) {
+    printOutput({
+      command,
+      model,
+      prompt,
+      result: prompt
+    }, Boolean(options.json));
+    return;
+  }
+
+  ensureDirectory(outputDir);
+  fs.writeFileSync(promptFile, prompt, "utf8");
+
+  const claude = run("claude", [
+    "-p",
+    prompt,
+    "--model",
+    model,
+    "--output-format",
+    "json",
+    "--no-session-persistence"
+  ], { cwd });
+  fs.writeFileSync(jsonFile, claude.stdout ?? "", "utf8");
+  const spawnError = claude.error instanceof Error ? claude.error.message : "";
+  const stderrLog = [claude.stderr ?? "", spawnError].filter(Boolean).join("\n");
+  fs.writeFileSync(logFile, stderrLog, "utf8");
+
+  const parsed = readJsonResult(claude.stdout ?? "");
+  fs.writeFileSync(mdFile, parsed.result || "", "utf8");
+  const isClaudeError = parsed.parsed?.is_error === true;
+  const payload = {
+    command,
+    label: commandLabel(command),
+    model,
+    status: claude.status,
+    success: claude.status === 0 && !isClaudeError && !parsed.parseError,
+    outputDir,
+    promptFile,
+    jsonFile,
+    logFile,
+    markdownFile: mdFile,
+    parseError: parsed.parseError,
+    spawnError: spawnError || null,
+    claudeError: isClaudeError ? parsed.parsed?.result ?? "Claude returned is_error=true." : null,
+    result: parsed.result
+  };
+  printOutput(payload, Boolean(options.json));
+  if (!payload.success) {
+    process.exitCode = claude.status || 1;
+  }
+}
+
+function main() {
+  const [command, ...argv] = process.argv.slice(2);
+  if (!command || command === "--help" || command === "help") {
+    usage();
+    return;
+  }
+  if (!VALID_COMMANDS.has(command)) {
+    throw new Error(`Unknown command: ${command}`);
+  }
+  const { options, positionals } = parseArgs(argv);
+  if (command === "setup") {
+    handleSetup(options);
+    return;
+  }
+  handleClaudeCommand(command, options, positionals);
+}
+
+try {
+  main();
+} catch (error) {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+}
