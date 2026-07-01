@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Rescue"
+  short_description: "Ask Claude for investigation or fix help"
+  default_prompt: "Use $rescue to ask Claude for a rescue pass on this issue."
