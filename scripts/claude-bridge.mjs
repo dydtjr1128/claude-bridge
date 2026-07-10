@@ -157,22 +157,35 @@ export function commandReport(result) {
   };
 }
 
-function readJsonResult(raw) {
-  if (!raw.trim()) {
-    return { result: "", parsed: null, parseError: "Claude produced no JSON output." };
+export function resolveClaudeOutput(raw, options = {}) {
+  const output = outputText(raw);
+  const partialOutput = options.timedOut ? output : null;
+  if (!output.trim()) {
+    return {
+      result: "",
+      parsed: null,
+      parseError: "Claude produced no JSON output.",
+      partialOutput,
+      hasResult: false
+    };
   }
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(output);
+    const result = typeof parsed.result === "string" ? parsed.result : "";
     return {
-      result: typeof parsed.result === "string" ? parsed.result : "",
+      result,
       parsed,
-      parseError: null
+      parseError: null,
+      partialOutput,
+      hasResult: Boolean(result.trim())
     };
   } catch (error) {
     return {
-      result: raw,
+      result: output,
       parsed: null,
-      parseError: error instanceof Error ? error.message : String(error)
+      parseError: error instanceof Error ? error.message : String(error),
+      partialOutput,
+      hasResult: false
     };
   }
 }
@@ -265,10 +278,10 @@ function handleClaudeCommand(command, options, positionals) {
   const stderrLog = [claude.stderr ?? "", spawnError].filter(Boolean).join("\n");
   fs.writeFileSync(logFile, stderrLog, "utf8");
 
-  const parsed = readJsonResult(claude.stdout ?? "");
+  const timedOut = claude.error?.code === "ETIMEDOUT";
+  const parsed = resolveClaudeOutput(claude.stdout ?? "", { timedOut });
   fs.writeFileSync(mdFile, parsed.result || "", "utf8");
   const isClaudeError = parsed.parsed?.is_error === true;
-  const timedOut = claude.error?.code === "ETIMEDOUT";
   const payload = {
     command,
     label: commandLabel(command),
@@ -276,13 +289,19 @@ function handleClaudeCommand(command, options, positionals) {
     timeout,
     timedOut,
     status: claude.status,
-    success: claude.status === 0 && !timedOut && !isClaudeError && !parsed.parseError,
+    success:
+      claude.status === 0 &&
+      !timedOut &&
+      !isClaudeError &&
+      !parsed.parseError &&
+      parsed.hasResult,
     outputDir,
     promptFile,
     jsonFile,
     logFile,
     markdownFile: mdFile,
     parseError: parsed.parseError,
+    partialOutput: parsed.partialOutput,
     spawnError: spawnError || null,
     claudeError: isClaudeError ? parsed.parsed?.result ?? "Claude returned is_error=true." : null,
     result: parsed.result

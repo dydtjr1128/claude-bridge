@@ -72,6 +72,39 @@ test("commandReport preserves provider failure and timeout metadata", async () =
   assert.equal(timeoutReport.timedOut, true);
 });
 
+test("resolveClaudeOutput preserves truncated raw JSON from a timed-out run", async () => {
+  const bridge = await loadBridge();
+  const raw = '{"result":"partial review';
+
+  const output = bridge.resolveClaudeOutput(raw, { timedOut: true });
+
+  assert.equal(output.result, raw);
+  assert.equal(output.partialOutput, raw);
+  assert.equal(output.hasResult, false);
+  assert.match(output.parseError, /JSON|position|unterminated|end/i);
+});
+
+test("resolveClaudeOutput preserves a timed-out JSON envelope without a result", async () => {
+  const bridge = await loadBridge();
+  const raw = '{"type":"result","is_error":false}';
+
+  const output = bridge.resolveClaudeOutput(raw, { timedOut: true });
+
+  assert.equal(output.result, "");
+  assert.equal(output.partialOutput, raw);
+  assert.equal(output.hasResult, false);
+  assert.equal(output.parseError, null);
+});
+
+test("resolveClaudeOutput requires a nonempty JSON result for completion", async () => {
+  const bridge = await loadBridge();
+
+  for (const raw of ["", "not JSON", "{}", '{"result":""}']) {
+    const output = bridge.resolveClaudeOutput(raw);
+    assert.equal(output.hasResult, false, raw);
+  }
+});
+
 const boundedPolicy = [
   "Do not execute programs unless the user explicitly and directly requests that execution.",
   "Complete one bounded pass within five minutes.",
