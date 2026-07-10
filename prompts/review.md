@@ -4,8 +4,11 @@ Scope: {{SCOPE}}
 User focus: {{USER_FOCUS}}
 
 Do not edit files.
-Do not run workflows, CI, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs you to run that exact command. A review request is not permission to run them.
-Use read-only inspection and lightweight local commands only when needed to ground findings.
+Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Complete one bounded pass within five minutes.
+Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
+If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+Limit verification to static file and line inspection.
 
 Prioritize correctness bugs, behavioral regressions, security risks, and missing tests.
 Report only actionable findings grounded in files, line numbers, or command output.

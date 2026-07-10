@@ -16,14 +16,13 @@ This plugin is for Codex users who want a convenient way to ask the local Claude
 - A working Claude CLI login or API configuration.
 - Codex with local plugin support.
 
-Check Claude readiness with:
+When you explicitly want executable validation, run the setup diagnostic:
 
 ```powershell
-claude --version
-claude -p "Respond with exactly: OK" --model claude-sonnet-5 --no-session-persistence
+node .\scripts\claude-bridge.mjs setup
 ```
 
-`claude auth status` is useful but not sufficient by itself. A cached login can look valid while print mode still fails.
+The review skills do not run this diagnostic automatically. A review or investigation request alone is not explicit user intent to validate executables.
 
 ## Install
 
@@ -117,7 +116,7 @@ node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in
 node .\scripts\claude-bridge.mjs rescue --scope "the failing parser test"
 ```
 
-The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent.
+The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent. Review-oriented commands accept `--timeout <duration>` using `ms`, `s`, `m`, or combined values such as `5m0s`. The default hard timeout is `5m0s`.
 
 ### `$review`
 
@@ -159,7 +158,7 @@ Use $adversarial-review to look for race conditions and rollback risks.
 Use $adversarial-review with Opus if this change is high risk.
 ```
 
-The default guidance uses Sonnet 5 for broad coverage and reserves Opus 4.8 for high-risk or deep reviews.
+The default guidance uses Sonnet 5. Opus 4.8 and `--deep` require explicit user intent; risk or complexity alone does not select them.
 
 ### `$rescue`
 
@@ -191,21 +190,22 @@ Claude Bridge normalizes common shorthand before calling Claude CLI:
 
 Default model policy:
 
-- Use `claude-sonnet-5` for ordinary reviews, broad multi-review coverage, smoke checks, debugging, and fix planning.
-- Use `claude-opus-4-8` sparingly because it is expensive.
-- Prefer Opus only for high-risk security, data loss, migrations, concurrency, rollback/idempotency, complex architecture, or final tie-breaker review.
+- Use `claude-sonnet-5` for the default review, challenge pass, investigation, and fix planning.
+- Use `claude-opus-4-8` or `--deep` only when the user explicitly requests Opus.
+- Do not add reviewers, retry, or switch models automatically after a failed or incomplete pass.
 
 ## Safety Rules
 
 Claude Bridge treats Claude output as advisory. Codex should verify findings locally before acting on them.
 
-Review and adversarial-review runs are read-only. They explicitly tell Claude:
+Review and adversarial-review runs are read-only. All three modes use the same bounded execution contract:
 
-- do not edit files;
-- do not run workflows, CI, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs that exact command;
-- use read-only inspection and lightweight local commands only when needed to ground findings.
+Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Complete one bounded pass within five minutes.
+Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
+If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 
-A general review request is not permission to run CI, deploy, release, or trigger workflow automation.
+Local verification is limited to static file and line inspection. Executable validation, Opus, `--deep`, retries, and fixes each require explicit user intent.
 
 ## Output Handling
 
@@ -216,6 +216,8 @@ The helper captures Claude output to files under:
 ```
 
 Claude JSON output should be read from the `result` field. Logs should be inspected only for failures.
+
+Machine-readable helper results include `timeout` and `timedOut` metadata. A timed-out run preserves any partial provider output, returns failure, and is not retried automatically.
 
 ## Relationship To Codex Plugin CC
 

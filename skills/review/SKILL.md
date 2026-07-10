@@ -9,21 +9,28 @@ Use the local `claude` executable as an external reviewer. Treat Claude output a
 
 ## Preflight
 
-Check the CLI and run a real print-mode smoke test:
+Do not run automatic executable validation or print-mode smoke tests. Limit local verification to static file and line inspection.
+
+If the user explicitly requests executable validation, `setup` remains available as an explicit diagnostic command:
 
 ```powershell
-Get-Command claude -ErrorAction SilentlyContinue
-claude --version
-claude -p "Respond with exactly: OK" --model claude-sonnet-5 --no-session-persistence
+node .\scripts\claude-bridge.mjs setup
 ```
 
-`claude auth status` is not enough; cached auth can look valid while print mode fails. Warnings about extra certs are non-blocking only when the command exits 0 and returns usable output.
+## Bounded Execution Policy
+
+Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Complete one bounded pass within five minutes.
+Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
+If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+
+Executable validation, Opus, `--deep`, retries, and fixes each require explicit user intent. Do not infer that intent from risk, difficulty, a failed review, or a review request.
 
 ## Model Selection
 
-- Use `claude-sonnet-5` by default for ordinary reviews, small-to-medium diffs, smoke checks, and broad multi-review coverage.
-- Use `claude-opus-4-8` only when the user explicitly asks for Opus or the review is high-risk: security, data loss, migrations, concurrency, rollback, idempotency, or complex architecture.
-- Normalize invalid shorthand: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
+- Use `claude-sonnet-5` by default for an ordinary review.
+- Use `claude-opus-4-8` only when the user explicitly asks for Opus or `--deep`.
+- Normalize shorthand only after the user selects a model: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
 
 ## Review Prompt
 
@@ -33,8 +40,11 @@ Use this shape and preserve the user's scope:
 You are an independent code reviewer.
 Scope: <exact diff, branch, files, or user-provided scope>
 Do not edit files.
-Do not run workflows, CI, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs you to run that exact command. A review request is not permission to run them.
-Use read-only inspection and lightweight local commands only when needed to ground findings.
+Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Complete one bounded pass within five minutes.
+Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
+If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+Limit verification to static file and line inspection.
 Prioritize correctness bugs, behavioral regressions, security risks, and missing tests.
 Return findings first, ordered by severity, with file/line references.
 If there are no actionable findings, say that clearly and mention residual test gaps.
@@ -53,9 +63,9 @@ If using this skill from its installed plugin cache, resolve the helper relative
 Useful options:
 
 - `--model claude-sonnet-5` for the default ordinary review model.
-- `--deep` to prefer `claude-opus-4-8` for high-risk review.
+- `--deep` only when the user explicitly requests a deeper Opus pass.
+- `--timeout <duration>` to set the hard limit; the default is `5m0s`.
 - `--scope "<scope>"` to preserve the user's exact target.
-- `--dry-run` to inspect the generated prompt without calling Claude.
 
 The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.
 

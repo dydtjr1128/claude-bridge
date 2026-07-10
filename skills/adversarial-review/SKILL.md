@@ -9,22 +9,33 @@ Use Claude CLI for a review-only challenge pass. This is not a normal defect swe
 
 ## Preflight
 
+Do not run automatic executable validation or print-mode smoke tests. Limit local verification to static file and line inspection.
+
+If the user explicitly requests executable validation, `setup` remains available as an explicit diagnostic command:
+
 ```powershell
-Get-Command claude -ErrorAction SilentlyContinue
-claude --version
-claude -p "Respond with exactly: OK" --model claude-sonnet-5 --no-session-persistence
+node .\scripts\claude-bridge.mjs setup
 ```
 
-If a requested model fails with "There's an issue with the selected model", normalize shorthand before declaring Claude unavailable:
+## Bounded Execution Policy
+
+Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Complete one bounded pass within five minutes.
+Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
+If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+
+Executable validation, Opus, `--deep`, retries, and fixes each require explicit user intent. Do not infer that intent from risk, difficulty, a failed review, or an adversarial review request.
+
+Normalize shorthand only after the user explicitly selects a model:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
 - `opus4.8` or `opus 4.8` -> `claude-opus-4-8`
 
 ## Model Selection
 
-- Use `claude-sonnet-5` for routine challenge reviews and broad coverage.
-- Use `claude-opus-4-8` sparingly because it is expensive. Reserve it for high-risk adversarial review: security boundaries, data loss, migrations, concurrency, rollback/idempotency, distributed state, or when cheaper reviewers disagree.
-- For many Claude reviewers, allocate most runs to Sonnet 5 and at most one Opus pass unless the user explicitly requests more Opus coverage.
+- Use `claude-sonnet-5` for the default challenge review.
+- Use `claude-opus-4-8` only when the user explicitly asks for Opus or `--deep`.
+- Do not add reviewers or change models after a failure unless the user directly requests another pass.
 
 ## Adversarial Prompt
 
@@ -32,8 +43,11 @@ If a requested model fails with "There's an issue with the selected model", norm
 You are an adversarial software reviewer.
 Scope: <same exact scope the user gave>
 Do not edit files.
-Do not run workflows, CI pipelines, deployment scripts, release tasks, or workflow automation unless the user explicitly and directly instructs you to run that exact command. An adversarial review request is not permission to run them.
-Use read-only inspection and lightweight local commands only when needed to ground findings.
+Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Complete one bounded pass within five minutes.
+Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
+If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+Limit verification to static file and line inspection.
 
 Try to find the strongest reasons this should not ship yet.
 Prioritize data loss, corruption, migrations, schema drift, concurrency, rollback, idempotency, trust boundaries, stale state, and missing tests.
@@ -51,7 +65,7 @@ node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in
 
 If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
 
-Use `--deep` or `--model claude-opus-4-8` only when the scope is high-risk or the user explicitly wants Opus. Otherwise prefer Sonnet 5.
+Use `--deep` or `--model claude-opus-4-8` only when the user explicitly requests Opus. Use `--timeout <duration>` to change the hard limit from its `5m0s` default.
 
 The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.
 

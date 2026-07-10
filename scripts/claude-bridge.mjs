@@ -14,16 +14,17 @@ function usage() {
   console.log([
     "Usage:",
     "  node scripts/claude-bridge.mjs setup [--json]",
-    "  node scripts/claude-bridge.mjs review [--model <model>] [--language <lang>] [--scope <text>] [focus ...]",
-    "  node scripts/claude-bridge.mjs adversarial-review [--model <model>|--deep] [--language <lang>] [--scope <text>] [focus ...]",
-    "  node scripts/claude-bridge.mjs rescue [--model <model>|--deep] [--language <lang>] [--scope <text>] [request ...]",
+    "  node scripts/claude-bridge.mjs review [--model <model>] [--timeout <duration>] [--language <lang>] [--scope <text>] [focus ...]",
+    "  node scripts/claude-bridge.mjs adversarial-review [--model <model>|--deep] [--timeout <duration>] [--language <lang>] [--scope <text>] [focus ...]",
+    "  node scripts/claude-bridge.mjs rescue [--model <model>|--deep] [--timeout <duration>] [--language <lang>] [--scope <text>] [request ...]",
     "",
     "Options:",
     "  --cwd <path>          Run from this repository path.",
     "  --output-dir <path>   Store Claude JSON, log, prompt, and markdown output here.",
+    "  --timeout <duration>  Stop a review after this duration (default: 5m0s).",
     "  --dry-run             Print the generated prompt without calling Claude.",
     "  --json                Print machine-readable wrapper output.",
-    "  --deep                Prefer claude-opus-4-8 for high-risk/deep review."
+    "  --deep                Select claude-opus-4-8 when explicitly requested."
   ].join("\n"));
 }
 
@@ -49,6 +50,24 @@ function parseArgs(argv) {
     index += 1;
   }
   return { options, positionals };
+}
+
+export function parseDuration(value) {
+  const input = String(value ?? "").trim();
+  const match = /^(?:(\d+)m)?(?:(\d+)s)?(?:(\d+)ms)?$/.exec(input);
+  if (!match) {
+    throw new Error(`Invalid timeout duration: ${value}`);
+  }
+
+  const totalMs =
+    Number(match[1] ?? 0) * 60_000 +
+    Number(match[2] ?? 0) * 1_000 +
+    Number(match[3] ?? 0);
+  if (totalMs <= 0 || !Number.isSafeInteger(totalMs)) {
+    throw new Error(`Invalid timeout duration: ${value}`);
+  }
+
+  return totalMs;
 }
 
 function normalizeModel(model, command, deep) {
@@ -111,13 +130,15 @@ function commandLabel(command) {
   return command === "adversarial-review" ? "adversarial review" : command;
 }
 
-function run(command, args, options = {}) {
-  return spawnSync(command, args, {
+export function run(command, args, options = {}) {
+  const spawn = options.spawn ?? spawnSync;
+  return spawn(command, args, {
     cwd: options.cwd,
     encoding: "utf8",
     env: process.env,
     windowsHide: true,
-    maxBuffer: 20 * 1024 * 1024
+    maxBuffer: 20 * 1024 * 1024,
+    timeout: options.timeoutMs
   });
 }
 
@@ -125,13 +146,14 @@ function outputText(value) {
   return typeof value === "string" ? value : "";
 }
 
-function commandReport(result) {
+export function commandReport(result) {
   const spawnError = result.error instanceof Error ? result.error.message : "";
   const stderr = [outputText(result.stderr).trim(), spawnError].filter(Boolean).join("\n");
   return {
     status: result.status,
     stdout: outputText(result.stdout).trim(),
-    stderr
+    stderr,
+    timedOut: result.error?.code === "ETIMEDOUT"
   };
 }
 
@@ -193,6 +215,8 @@ function handleSetup(options) {
 
 function handleClaudeCommand(command, options, positionals) {
   const cwd = path.resolve(options.cwd ?? process.cwd());
+  const timeout = String(options.timeout ?? "5m0s").trim();
+  const timeoutMs = parseDuration(timeout);
   const scope = options.scope ?? "current git diff in this repository";
   const userFocus = positionals.join(" ").trim() || "No extra focus provided.";
   const language = options.language ?? "Korean unless the user requested another language";
@@ -216,6 +240,8 @@ function handleClaudeCommand(command, options, positionals) {
     printOutput({
       command,
       model,
+      timeout,
+      timedOut: false,
       prompt,
       result: prompt
     }, Boolean(options.json));
@@ -233,7 +259,7 @@ function handleClaudeCommand(command, options, positionals) {
     "--output-format",
     "json",
     "--no-session-persistence"
-  ], { cwd });
+  ], { cwd, timeoutMs });
   fs.writeFileSync(jsonFile, claude.stdout ?? "", "utf8");
   const spawnError = claude.error instanceof Error ? claude.error.message : "";
   const stderrLog = [claude.stderr ?? "", spawnError].filter(Boolean).join("\n");
@@ -242,12 +268,15 @@ function handleClaudeCommand(command, options, positionals) {
   const parsed = readJsonResult(claude.stdout ?? "");
   fs.writeFileSync(mdFile, parsed.result || "", "utf8");
   const isClaudeError = parsed.parsed?.is_error === true;
+  const timedOut = claude.error?.code === "ETIMEDOUT";
   const payload = {
     command,
     label: commandLabel(command),
     model,
+    timeout,
+    timedOut,
     status: claude.status,
-    success: claude.status === 0 && !isClaudeError && !parsed.parseError,
+    success: claude.status === 0 && !timedOut && !isClaudeError && !parsed.parseError,
     outputDir,
     promptFile,
     jsonFile,
@@ -281,9 +310,15 @@ function main() {
   handleClaudeCommand(command, options, positionals);
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+const isMainModule = process.argv[1]
+  ? path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  : false;
+
+if (isMainModule) {
+  try {
+    main();
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  }
 }
