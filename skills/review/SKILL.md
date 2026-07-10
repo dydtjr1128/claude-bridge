@@ -23,6 +23,9 @@ Do not execute programs unless the user explicitly and directly requests that ex
 Complete one bounded pass within five minutes.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
+Do not perform repository-wide discovery, recursively follow references, or pursue speculative context.
+Once a finding has enough static evidence, report it; if evidence remains insufficient, state the uncertainty and remaining gap instead of continuing to investigate.
 
 Executable validation, Opus, `--deep`, retries, and fixes each require explicit user intent. Do not infer that intent from risk, difficulty, a failed review, or a review request.
 
@@ -44,6 +47,9 @@ Do not execute programs unless the user explicitly and directly requests that ex
 Complete one bounded pass within five minutes.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
+Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
+Do not perform repository-wide discovery, recursively follow references, or pursue speculative context.
+Once a finding has enough static evidence, report it; if evidence remains insufficient, state the uncertainty and remaining gap instead of continuing to investigate.
 Limit verification to static file and line inspection.
 Prioritize correctness bugs, behavioral regressions, security risks, and missing tests.
 Return findings first, ordered by severity, with file/line references.
