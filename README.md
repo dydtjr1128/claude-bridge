@@ -116,7 +116,7 @@ node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in
 node .\scripts\claude-bridge.mjs rescue --scope "the failing parser test"
 ```
 
-The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent. Review-oriented commands accept `--timeout <duration>` using `ms`, `s`, `m`, or combined values such as `5m0s`. The default hard timeout is `5m0s`.
+The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent. Review-oriented commands accept `--timeout <duration>` using `ms`, `s`, `m`, or combined values such as `10m0s`. The default hard timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`.
 
 ### `$review`
 
@@ -201,7 +201,7 @@ Claude Bridge treats Claude output as advisory. Codex should verify findings loc
 Review and adversarial-review runs are read-only. All three modes use the same bounded execution contract:
 
 Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
-Complete one bounded pass within five minutes.
+Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 

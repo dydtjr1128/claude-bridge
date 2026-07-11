@@ -20,7 +20,7 @@ node .\scripts\claude-bridge.mjs setup
 ## Bounded Execution Policy
 
 Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
-Complete one bounded pass within five minutes.
+Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
@@ -44,7 +44,7 @@ You are an independent code reviewer.
 Scope: <exact diff, branch, files, or user-provided scope>
 Do not edit files.
 Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
-Complete one bounded pass within five minutes.
+Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
@@ -70,7 +70,7 @@ Useful options:
 
 - `--model claude-sonnet-5` for the default ordinary review model.
 - `--deep` only when the user explicitly requests a deeper Opus pass.
-- `--timeout <duration>` to set the hard limit; the default is `5m0s`.
+- `--timeout <duration>` to override the hard limit; the default is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`.
 - `--scope "<scope>"` to preserve the user's exact target.
 
 The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.

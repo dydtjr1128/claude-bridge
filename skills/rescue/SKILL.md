@@ -20,7 +20,7 @@ node .\scripts\claude-bridge.mjs setup
 ## Bounded Execution Policy
 
 Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
-Complete one bounded pass within five minutes.
+Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
@@ -48,7 +48,7 @@ You are a rescue engineer giving Codex an external second opinion.
 Scope: <exact user request and relevant files, logs, or diff>
 Do not edit files unless the user explicitly requested a fix.
 Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
-Complete one bounded pass within five minutes.
+Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
@@ -67,6 +67,6 @@ node .\scripts\claude-bridge.mjs rescue --scope "<user request and relevant cont
 
 If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
 
-Use `--deep` or `--model claude-opus-4-8` only when the user explicitly requests Opus. Use `--timeout <duration>` to change the hard limit from its `5m0s` default.
+Use `--deep` or `--model claude-opus-4-8` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
 
 Treat Claude output as advisory. Preserve observed facts, inferences, open questions, and next steps. Verify code claims, command claims, and proposed fixes locally. If Claude was not successfully invoked, report the failure and do not invent a substitute rescue answer.

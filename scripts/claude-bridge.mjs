@@ -9,6 +9,20 @@ import { fileURLToPath } from "node:url";
 const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PROMPT_DIR = path.join(ROOT_DIR, "prompts");
 const VALID_COMMANDS = new Set(["setup", "review", "adversarial-review", "rescue"]);
+export const CLAUDE_DEFAULT_TIMEOUT = "10m0s";
+export const CLAUDE_SLOW_MODEL_TIMEOUT = "15m0s";
+export const CLAUDE_FABLE_TIMEOUT = "20m0s";
+
+export function defaultTimeoutForModel(model) {
+  const normalized = String(model);
+  if (/fable/i.test(normalized)) {
+    return CLAUDE_FABLE_TIMEOUT;
+  }
+  if (/opus/i.test(normalized)) {
+    return CLAUDE_SLOW_MODEL_TIMEOUT;
+  }
+  return CLAUDE_DEFAULT_TIMEOUT;
+}
 
 function usage() {
   console.log([
@@ -21,7 +35,7 @@ function usage() {
     "Options:",
     "  --cwd <path>          Run from this repository path.",
     "  --output-dir <path>   Store Claude JSON, log, prompt, and markdown output here.",
-    "  --timeout <duration>  Stop a review after this duration (default: 5m0s).",
+    `  --timeout <duration>  Stop a review after this duration (default: ${CLAUDE_DEFAULT_TIMEOUT}; Opus: ${CLAUDE_SLOW_MODEL_TIMEOUT}; Fable: ${CLAUDE_FABLE_TIMEOUT}).`,
     "  --dry-run             Print the generated prompt without calling Claude.",
     "  --json                Print machine-readable wrapper output.",
     "  --deep                Select claude-opus-4-8 when explicitly requested."
@@ -228,12 +242,12 @@ function handleSetup(options) {
 
 function handleClaudeCommand(command, options, positionals) {
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const timeout = String(options.timeout ?? "5m0s").trim();
-  const timeoutMs = parseDuration(timeout);
   const scope = options.scope ?? "current git diff in this repository";
   const userFocus = positionals.join(" ").trim() || "No extra focus provided.";
   const language = options.language ?? "Korean unless the user requested another language";
   const model = normalizeModel(options.model, command, Boolean(options.deep));
+  const timeout = String(options.timeout ?? defaultTimeoutForModel(model)).trim();
+  const timeoutMs = parseDuration(timeout);
   const outputDir = path.resolve(
     cwd,
     options["output-dir"] ?? path.join(".codex", "claude-bridge", `run-${timestamp()}`)
@@ -242,7 +256,8 @@ function handleClaudeCommand(command, options, positionals) {
   const prompt = renderPrompt(loadPrompt(command), {
     SCOPE: scope,
     USER_FOCUS: userFocus,
-    LANGUAGE: language
+    LANGUAGE: language,
+    TIMEOUT: timeout
   });
   const promptFile = path.join(outputDir, `${command}.prompt.md`);
   const jsonFile = path.join(outputDir, `${command}.json`);

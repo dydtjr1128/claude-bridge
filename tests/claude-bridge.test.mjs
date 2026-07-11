@@ -24,6 +24,14 @@ test("parseDuration accepts bounded duration syntax and rejects invalid values",
   }
 });
 
+test("default timeout scales with the selected Claude model", async () => {
+  const bridge = await loadBridge();
+
+  assert.equal(bridge.defaultTimeoutForModel("claude-sonnet-5"), "10m0s");
+  assert.equal(bridge.defaultTimeoutForModel("claude-opus-4-8"), "15m0s");
+  assert.equal(bridge.defaultTimeoutForModel("team-fable-reviewer"), "20m0s");
+});
+
 test("run passes a hard timeout to an injected provider", async () => {
   const bridge = await loadBridge();
   let invocation;
@@ -107,7 +115,6 @@ test("resolveClaudeOutput requires a nonempty JSON result for completion", async
 
 const boundedPolicy = [
   "Do not execute programs unless the user explicitly and directly requests that execution.",
-  "Complete one bounded pass within five minutes.",
   "Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.",
   "If the available time or evidence is insufficient, return the supported findings and state the remaining gap.",
   "Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.",
@@ -125,6 +132,7 @@ test("review prompts enforce one bounded non-executing pass", () => {
     for (const sentence of boundedPolicy) {
       assert.match(text, exactSentence(sentence));
     }
+    assert.match(text, /selected hard timeout \(\{\{TIMEOUT\}\}\)/i);
     assert.doesNotMatch(text, /lightweight local commands/i);
   }
 });
@@ -135,6 +143,8 @@ test("skills limit preflight and verification to explicit, static actions", () =
     for (const sentence of boundedPolicy) {
       assert.match(text, exactSentence(sentence));
     }
+    assert.match(text, /helper-selected timeout/i);
+    assert.match(text, /ten minutes[\s\S]*fifteen minutes[\s\S]*twenty minutes/i);
     assert.match(text, /static file and line inspection/i);
     assert.match(text, /setup/i);
     assert.doesNotMatch(text, /claude -p "Respond with exactly: OK"/);
@@ -143,6 +153,8 @@ test("skills limit preflight and verification to explicit, static actions", () =
 
   const readme = readFileSync(path.join(ROOT_DIR, "README.md"), "utf8");
   assert.match(readme, /--timeout <duration>/);
-  assert.match(readme, /5m0s/);
+  assert.match(readme, /10m0s/);
+  assert.match(readme, /15m0s/);
+  assert.match(readme, /20m0s/);
   assert.match(readme, /explicit user intent/i);
 });
