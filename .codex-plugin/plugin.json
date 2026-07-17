@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Bridge from Codex and other agents to Claude CLI for review, adversarial review, and rescue passes.",
   "author": {
-    "name": "Local developer",
+    "name": "dydtjr1128",
     "email": "dydtjr1128@gmail.com",
     "url": "https://github.com/dydtjr1128"
   },
@@ -20,7 +20,7 @@
     "displayName": "Claude Bridge",
     "shortDescription": "Use Claude CLI for external passes.",
     "longDescription": "Claude Bridge provides Codex skills that call the local Claude CLI for ordinary reviews, adversarial challenge reviews, and rescue-style investigation or follow-up work. It keeps review runs read-only, normalizes Claude model names, and verifies findings before treating them as fact.",
-    "developerName": "Local developer",
+    "developerName": "dydtjr1128",
     "category": "Productivity",
     "capabilities": [
       "Review",

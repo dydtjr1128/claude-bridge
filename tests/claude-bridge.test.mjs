@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -30,6 +30,15 @@ test("default timeout scales with the selected Claude model", async () => {
   assert.equal(bridge.defaultTimeoutForModel("claude-sonnet-5"), "10m0s");
   assert.equal(bridge.defaultTimeoutForModel("claude-opus-4-8"), "15m0s");
   assert.equal(bridge.defaultTimeoutForModel("team-fable-reviewer"), "20m0s");
+});
+
+test("default review scope covers all uncommitted work", async () => {
+  const bridge = await loadBridge();
+
+  assert.equal(
+    bridge.DEFAULT_REVIEW_SCOPE,
+    "all current uncommitted changes in this repository, including staged, unstaged, and untracked files"
+  );
 });
 
 test("run passes a hard timeout to an injected provider", async () => {
@@ -142,6 +151,7 @@ test("Claude reviews use isolated read-only-oriented arguments", async () => {
 const boundedPolicy = [
   "Do not execute project code or validation commands unless the user explicitly and directly requests that execution.",
   "Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`.",
+  "When the scope is current uncommitted work, include staged, unstaged, and untracked files; enumerate them with read-only Git inspection before reviewing only those changes.",
   "Do not use shell commands for any other purpose, and do not run commands that modify files, the index, refs, configuration, or other repository state.",
   "Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.",
   "If the available time or evidence is insufficient, return the supported findings and state the remaining gap.",
@@ -185,4 +195,9 @@ test("skills limit preflight and verification to explicit, static actions", () =
   assert.match(readme, /15m0s/);
   assert.match(readme, /20m0s/);
   assert.match(readme, /explicit user intent/i);
+});
+
+test("repository declares Apache-2.0 licensing", () => {
+  assert.ok(existsSync(path.join(ROOT_DIR, "LICENSE")));
+  assert.match(readFileSync(path.join(ROOT_DIR, "LICENSE"), "utf8"), /Apache License[\s\S]*Version 2\.0/);
 });

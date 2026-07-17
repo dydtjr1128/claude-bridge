@@ -111,8 +111,8 @@ Claude Bridge includes a small companion script inspired by the helper-runtime p
 
 ```powershell
 node .\scripts\claude-bridge.mjs setup
-node .\scripts\claude-bridge.mjs review --scope "current git diff in this repository"
-node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in this repository"
+node .\scripts\claude-bridge.mjs review --scope "all current uncommitted changes, including staged, unstaged, and untracked files"
+node .\scripts\claude-bridge.mjs adversarial-review --scope "all current uncommitted changes, including staged, unstaged, and untracked files"
 node .\scripts\claude-bridge.mjs rescue --scope "the failing parser test"
 ```
 
@@ -245,3 +245,7 @@ prompts/
 scripts/
   claude-bridge.mjs
 ```
+
+## License
+
+Licensed under the Apache License, Version 2.0. See `LICENSE` for the full terms.

@@ -25,6 +25,7 @@ The helper runs Claude Code with safe mode, no MCP configuration, slash commands
 
 Do not execute project code or validation commands unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
 Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`.
+When the scope is current uncommitted work, include staged, unstaged, and untracked files; enumerate them with read-only Git inspection before reviewing only those changes.
 Do not use shell commands for any other purpose, and do not run commands that modify files, the index, refs, configuration, or other repository state.
 Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
@@ -74,7 +75,7 @@ Then give a short structural verdict: solid parts, fragile parts, and top 3 impr
 ## Preferred Helper
 
 ```powershell
-node .\scripts\claude-bridge.mjs adversarial-review --scope "current git diff in this repository"
+node .\scripts\claude-bridge.mjs adversarial-review --scope "all current uncommitted changes, including staged, unstaged, and untracked files"
 ```
 
 If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
