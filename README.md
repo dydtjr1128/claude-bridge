@@ -200,7 +200,10 @@ Claude Bridge treats Claude output as advisory. Codex should verify findings loc
 
 Review and adversarial-review runs are read-only. All three modes use the same bounded execution contract:
 
-Do not execute programs unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+The helper runs Claude Code with safe mode, no MCP configuration, slash commands disabled, Chrome disabled, built-in tools limited to `Read`, `Glob`, `Grep`, and `Bash`, and `dontAsk` permission mode.
+
+Do not execute project code or validation commands unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
+Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`. Shell commands must not be used for any other purpose or modify files, the index, refs, configuration, or other repository state.
 Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.

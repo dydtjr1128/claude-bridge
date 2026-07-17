@@ -12,6 +12,30 @@ const VALID_COMMANDS = new Set(["setup", "review", "adversarial-review", "rescue
 export const CLAUDE_DEFAULT_TIMEOUT = "10m0s";
 export const CLAUDE_SLOW_MODEL_TIMEOUT = "15m0s";
 export const CLAUDE_FABLE_TIMEOUT = "20m0s";
+export const CLAUDE_REVIEW_TOOLS = "Read,Glob,Grep,Bash";
+
+export function buildClaudeArgs(prompt, options = {}) {
+  const args = [
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "--no-chrome",
+    "--tools",
+    CLAUDE_REVIEW_TOOLS,
+    "--permission-mode",
+    "dontAsk",
+    "-p",
+    prompt
+  ];
+  if (options.model) {
+    args.push("--model", options.model);
+  }
+  if (options.outputFormat) {
+    args.push("--output-format", options.outputFormat);
+  }
+  args.push("--no-session-persistence");
+  return args;
+}
 
 export function defaultTimeoutForModel(model) {
   const normalized = String(model);
@@ -220,13 +244,9 @@ function printOutput(payload, asJson) {
 function handleSetup(options) {
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const version = run("claude", ["--version"], { cwd });
-  const smoke = run("claude", [
-    "-p",
-    "Respond with exactly: OK",
-    "--model",
-    "claude-sonnet-5",
-    "--no-session-persistence"
-  ], { cwd });
+  const smoke = run("claude", buildClaudeArgs("Respond with exactly: OK", {
+    model: "claude-sonnet-5"
+  }), { cwd });
   const versionReport = commandReport(version);
   const smokeReport = commandReport(smoke);
   const payload = {
@@ -279,15 +299,10 @@ function handleClaudeCommand(command, options, positionals) {
   ensureDirectory(outputDir);
   fs.writeFileSync(promptFile, prompt, "utf8");
 
-  const claude = run("claude", [
-    "-p",
-    prompt,
-    "--model",
+  const claude = run("claude", buildClaudeArgs(prompt, {
     model,
-    "--output-format",
-    "json",
-    "--no-session-persistence"
-  ], { cwd, timeoutMs });
+    outputFormat: "json"
+  }), { cwd, timeoutMs });
   fs.writeFileSync(jsonFile, claude.stdout ?? "", "utf8");
   const spawnError = claude.error instanceof Error ? claude.error.message : "";
   const stderrLog = [claude.stderr ?? "", spawnError].filter(Boolean).join("\n");

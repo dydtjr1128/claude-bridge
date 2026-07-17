@@ -113,8 +113,36 @@ test("resolveClaudeOutput requires a nonempty JSON result for completion", async
   }
 });
 
+test("Claude reviews use isolated read-only-oriented arguments", async () => {
+  const bridge = await loadBridge();
+
+  assert.equal(bridge.CLAUDE_REVIEW_TOOLS, "Read,Glob,Grep,Bash");
+  assert.deepEqual(bridge.buildClaudeArgs("review this diff", {
+    model: "claude-sonnet-5",
+    outputFormat: "json"
+  }), [
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "--no-chrome",
+    "--tools",
+    "Read,Glob,Grep,Bash",
+    "--permission-mode",
+    "dontAsk",
+    "-p",
+    "review this diff",
+    "--model",
+    "claude-sonnet-5",
+    "--output-format",
+    "json",
+    "--no-session-persistence"
+  ]);
+});
+
 const boundedPolicy = [
-  "Do not execute programs unless the user explicitly and directly requests that execution.",
+  "Do not execute project code or validation commands unless the user explicitly and directly requests that execution.",
+  "Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`.",
+  "Do not use shell commands for any other purpose, and do not run commands that modify files, the index, refs, configuration, or other repository state.",
   "Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.",
   "If the available time or evidence is insufficient, return the supported findings and state the remaining gap.",
   "Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.",
