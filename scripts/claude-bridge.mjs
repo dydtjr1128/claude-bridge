@@ -63,7 +63,7 @@ function usage() {
     `  --timeout <duration>  Stop a review after this duration (default: ${CLAUDE_DEFAULT_TIMEOUT}; Opus: ${CLAUDE_SLOW_MODEL_TIMEOUT}; Fable: ${CLAUDE_FABLE_TIMEOUT}).`,
     "  --dry-run             Print the generated prompt without calling Claude.",
     "  --json                Print machine-readable wrapper output.",
-    "  --deep                Select claude-opus-4-8 when explicitly requested."
+    "  --deep                Select claude-opus-5 when explicitly requested."
   ].join("\n"));
 }
 
@@ -109,7 +109,7 @@ export function parseDuration(value) {
   return totalMs;
 }
 
-function normalizeModel(model, command, deep) {
+export function normalizeModel(model, command, deep) {
   if (model) {
     const normalized = String(model).trim().toLowerCase();
     if (
@@ -122,6 +122,14 @@ function normalizeModel(model, command, deep) {
     }
     if (
       normalized === "opus" ||
+      normalized === "opus5" ||
+      normalized === "opus-5" ||
+      normalized === "opus 5" ||
+      normalized === "claude-opus-5"
+    ) {
+      return "claude-opus-5";
+    }
+    if (
       normalized === "opus4.8" ||
       normalized === "opus-4.8" ||
       normalized === "opus-4-8" ||
@@ -133,7 +141,7 @@ function normalizeModel(model, command, deep) {
     return model;
   }
   if (deep || command === "adversarial-review") {
-    return deep ? "claude-opus-4-8" : "claude-sonnet-5";
+    return deep ? "claude-opus-5" : "claude-sonnet-5";
   }
   return "claude-sonnet-5";
 }

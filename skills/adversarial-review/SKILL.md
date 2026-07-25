@@ -39,12 +39,13 @@ Executable validation, Opus, `--deep`, retries, and fixes each require explicit 
 Normalize shorthand only after the user explicitly selects a model:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
+- `opus`, `opus5`, `opus-5`, or `opus 5` -> `claude-opus-5`
 - `opus4.8` or `opus 4.8` -> `claude-opus-4-8`
 
 ## Model Selection
 
 - Use `claude-sonnet-5` for the default challenge review.
-- Use `claude-opus-4-8` only when the user explicitly asks for Opus or `--deep`.
+- Use `claude-opus-5` only when the user explicitly asks for Opus or `--deep`.
 - Do not add reviewers or change models after a failure unless the user directly requests another pass.
 
 ## Adversarial Prompt
@@ -80,7 +81,7 @@ node .\scripts\claude-bridge.mjs adversarial-review --scope "all current uncommi
 
 If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
 
-Use `--deep` or `--model claude-opus-4-8` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
+Use `--deep` or `--model claude-opus-5` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
 
 The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.
 

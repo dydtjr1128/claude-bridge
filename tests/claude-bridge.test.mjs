@@ -28,8 +28,19 @@ test("default timeout scales with the selected Claude model", async () => {
   const bridge = await loadBridge();
 
   assert.equal(bridge.defaultTimeoutForModel("claude-sonnet-5"), "10m0s");
+  assert.equal(bridge.defaultTimeoutForModel("claude-opus-5"), "15m0s");
   assert.equal(bridge.defaultTimeoutForModel("claude-opus-4-8"), "15m0s");
   assert.equal(bridge.defaultTimeoutForModel("team-fable-reviewer"), "20m0s");
+});
+
+test("current Opus shorthand and deep mode select Claude Opus 5", async () => {
+  const bridge = await loadBridge();
+
+  for (const model of ["opus", "opus5", "opus-5", "opus 5", "claude-opus-5"]) {
+    assert.equal(bridge.normalizeModel(model, "review", false), "claude-opus-5", model);
+  }
+  assert.equal(bridge.normalizeModel(undefined, "review", true), "claude-opus-5");
+  assert.equal(bridge.normalizeModel("opus4.8", "review", false), "claude-opus-4-8");
 });
 
 test("default review scope covers all uncommitted work", async () => {

@@ -39,12 +39,13 @@ Executable validation, Opus, `--deep`, retries, and fixes each require explicit 
 Normalize model shorthand only after the user explicitly selects a model:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
+- `opus`, `opus5`, `opus-5`, or `opus 5` -> `claude-opus-5`
 - `opus4.8` or `opus 4.8` -> `claude-opus-4-8`
 
 ## Mode Selection
 
 - Use `claude-sonnet-5` by default for investigation, log interpretation, and fix planning.
-- Use `claude-opus-4-8` only when the user explicitly asks for Opus or `--deep`.
+- Use `claude-opus-5` only when the user explicitly asks for Opus or `--deep`.
 - Do not retry, add reviewers, or change models after a failed attempt unless the user directly requests another pass.
 - If the user asks only for investigation, return findings and a plan; make a constrained fix only when explicitly requested.
 
@@ -76,6 +77,6 @@ node .\scripts\claude-bridge.mjs rescue --scope "<user request and relevant cont
 
 If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
 
-Use `--deep` or `--model claude-opus-4-8` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
+Use `--deep` or `--model claude-opus-5` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
 
 Treat Claude output as advisory. Preserve observed facts, inferences, open questions, and next steps. Verify code claims, command claims, and proposed fixes locally. If Claude was not successfully invoked, report the failure and do not invent a substitute rescue answer.

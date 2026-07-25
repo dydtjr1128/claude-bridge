@@ -158,7 +158,7 @@ Use $adversarial-review to look for race conditions and rollback risks.
 Use $adversarial-review with Opus if this change is high risk.
 ```
 
-The default guidance uses Sonnet 5. Opus 4.8 and `--deep` require explicit user intent; risk or complexity alone does not select them.
+The default guidance uses Sonnet 5. Opus 5 and `--deep` require explicit user intent; risk or complexity alone does not select them.
 
 ### `$rescue`
 
@@ -186,12 +186,13 @@ If you do not explicitly ask for a fix, `$rescue` should keep Claude in investig
 Claude Bridge normalizes common shorthand before calling Claude CLI:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
+- `opus`, `opus5`, `opus-5`, or `opus 5` -> `claude-opus-5`
 - `opus4.8`, `opus-4-8`, or `opus 4.8` -> `claude-opus-4-8`
 
 Default model policy:
 
 - Use `claude-sonnet-5` for the default review, challenge pass, investigation, and fix planning.
-- Use `claude-opus-4-8` or `--deep` only when the user explicitly requests Opus.
+- Use `claude-opus-5` or `--deep` only when the user explicitly requests Opus.
 - Do not add reviewers, retry, or switch models automatically after a failed or incomplete pass.
 
 ## Safety Rules

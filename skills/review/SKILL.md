@@ -39,8 +39,8 @@ Executable validation, Opus, `--deep`, retries, and fixes each require explicit 
 ## Model Selection
 
 - Use `claude-sonnet-5` by default for an ordinary review.
-- Use `claude-opus-4-8` only when the user explicitly asks for Opus or `--deep`.
-- Normalize shorthand only after the user selects a model: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
+- Use `claude-opus-5` only when the user explicitly asks for Opus or `--deep`.
+- Normalize shorthand only after the user selects a model: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus`, `opus5`, `opus-5`, and `opus 5` -> `claude-opus-5`; explicit legacy `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
 
 ## Review Prompt
 
