@@ -109,7 +109,7 @@ export function parseDuration(value) {
   return totalMs;
 }
 
-export function normalizeModel(model, command, deep) {
+export function normalizeModel(model, _command, deep) {
   if (model) {
     const normalized = String(model).trim().toLowerCase();
     if (
@@ -134,14 +134,15 @@ export function normalizeModel(model, command, deep) {
       normalized === "opus-4.8" ||
       normalized === "opus-4-8" ||
       normalized === "opus 4.8" ||
-      normalized === "opsu4.8"
+      normalized === "opsu4.8" ||
+      normalized === "claude-opus-4-8"
     ) {
       return "claude-opus-4-8";
     }
     return model;
   }
-  if (deep || command === "adversarial-review") {
-    return deep ? "claude-opus-5" : "claude-sonnet-5";
+  if (deep) {
+    return "claude-opus-5";
   }
   return "claude-sonnet-5";
 }

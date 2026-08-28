@@ -40,7 +40,16 @@ test("current Opus shorthand and deep mode select Claude Opus 5", async () => {
     assert.equal(bridge.normalizeModel(model, "review", false), "claude-opus-5", model);
   }
   assert.equal(bridge.normalizeModel(undefined, "review", true), "claude-opus-5");
-  assert.equal(bridge.normalizeModel("opus4.8", "review", false), "claude-opus-4-8");
+  for (const model of ["opus4.8", "opus 4.8", "claude-opus-4-8", "CLAUDE-OPUS-4-8"]) {
+    assert.equal(bridge.normalizeModel(model, "review", false), "claude-opus-4-8", model);
+  }
+});
+
+test("review commands default to Claude Sonnet 5 without explicit deep mode", async () => {
+  const bridge = await loadBridge();
+
+  assert.equal(bridge.normalizeModel(undefined, "review", false), "claude-sonnet-5");
+  assert.equal(bridge.normalizeModel(undefined, "adversarial-review", false), "claude-sonnet-5");
 });
 
 test("default review scope covers all uncommitted work", async () => {
