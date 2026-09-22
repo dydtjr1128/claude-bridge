@@ -17,9 +17,11 @@ If the user explicitly requests executable validation, `setup` remains available
 node .\scripts\claude-bridge.mjs setup
 ```
 
+For an explicitly requested fix, add `--allow-edits` to the helper invocation. This enables and permits built-in `Edit` and `Write`; without it, return investigation findings and a fix plan. The option does not authorize shell writes or program execution.
+
 ## Runtime Isolation
 
-The helper runs Claude Code with safe mode, no MCP configuration, slash commands disabled, Chrome disabled, and built-in tools limited to `Read`, `Glob`, `Grep`, and `Bash`. It uses `dontAsk` permission mode so unavailable actions fail instead of pausing for approval. Organization-managed policy may still apply.
+The helper runs Claude Code with safe mode, no MCP configuration, slash commands disabled, Chrome disabled, and built-in tools limited by default to `Read`, `Glob`, `Grep`, and `Bash`. It uses `dontAsk` permission mode so unavailable actions fail instead of pausing for approval. Organization-managed policy may still apply.
 
 ## Bounded Execution Policy
 
@@ -39,13 +41,16 @@ Executable validation, Opus, `--deep`, retries, and fixes each require explicit 
 Normalize model shorthand only after the user explicitly selects a model:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
-- `opus`, `opus5`, `opus-5`, or `opus 5` -> `claude-opus-5`
+- `opus` or `opus5.5` -> `claude-opus-5-5`; `fable` or `fable5.1` -> `claude-fable-5-1`
+- Explicit `opus5` / `claude-opus-5` and `fable5` / `claude-fable-5` remain pinned to version 5
 - `opus4.8` or `opus 4.8` -> `claude-opus-4-8`
+
+Use Fable 5.1 only when the user explicitly requests Fable.
 
 ## Mode Selection
 
 - Use `claude-sonnet-5` by default for investigation, log interpretation, and fix planning.
-- Use `claude-opus-5` only when the user explicitly asks for Opus or `--deep`.
+- Use `claude-opus-5-5` only when the user explicitly asks for Opus or `--deep`.
 - Do not retry, add reviewers, or change models after a failed attempt unless the user directly requests another pass.
 - If the user asks only for investigation, return findings and a plan; make a constrained fix only when explicitly requested.
 
@@ -73,10 +78,12 @@ If proposing a fix, include files and line references.
 
 ```powershell
 node .\scripts\claude-bridge.mjs rescue --scope "<user request and relevant context>"
+# Only after an explicit request for a fix:
+node .\scripts\claude-bridge.mjs rescue --allow-edits --scope "<authorized fix scope>"
 ```
 
 If using this skill from its installed plugin cache, resolve the helper relative to this `SKILL.md` as `../../scripts/claude-bridge.mjs`.
 
-Use `--deep` or `--model claude-opus-5` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
+Use `--deep` or `--model claude-opus-5-5` only when the user explicitly requests Opus. The default timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`; an explicit `--timeout <duration>` overrides it.
 
 Treat Claude output as advisory. Preserve observed facts, inferences, open questions, and next steps. Verify code claims, command claims, and proposed fixes locally. If Claude was not successfully invoked, report the failure and do not invent a substitute rescue answer.

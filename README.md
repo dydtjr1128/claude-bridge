@@ -186,14 +186,21 @@ If you do not explicitly ask for a fix, `$rescue` should keep Claude in investig
 Claude Bridge normalizes common shorthand before calling Claude CLI:
 
 - `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
-- `opus`, `opus5`, `opus-5`, or `opus 5` -> `claude-opus-5`
+- `opus` or `opus5.5` -> `claude-opus-5-5`; `fable` or `fable5.1` -> `claude-fable-5-1`
+- Explicit `opus5` / `claude-opus-5` and `fable5` / `claude-fable-5` remain pinned to version 5
 - `opus4.8`, `opus-4-8`, or `opus 4.8` -> `claude-opus-4-8`
+
+Canonical IDs follow the [Anthropic model reference](https://platform.claude.com/docs/en/models/overview). Fable is selected only when explicitly requested; `--deep` selects Opus 5.5. Unknown model IDs pass through unchanged. Opus keeps a 15-minute timeout and Fable keeps a 20-minute timeout.
 
 Default model policy:
 
 - Use `claude-sonnet-5` for the default review, challenge pass, investigation, and fix planning.
-- Use `claude-opus-5` or `--deep` only when the user explicitly requests Opus.
+- Use `claude-opus-5-5` or `--deep` only when the user explicitly requests Opus.
 - Do not add reviewers, retry, or switch models automatically after a failed or incomplete pass.
+
+Setup uses one two-minute deadline across the version and smoke probes; `--timeout` overrides it. A failed version probe or exhausted budget skips the smoke request. Unknown options and conflicting `--model` / `--deep` are rejected before execution.
+
+For an explicitly requested rescue fix, pass `rescue --allow-edits`. This adds and permits only the built-in `Edit` and `Write` tools; review commands reject the flag. Shell writes and program execution remain outside this option.
 
 ## Safety Rules
 
@@ -201,7 +208,7 @@ Claude Bridge treats Claude output as advisory. Codex should verify findings loc
 
 Review and adversarial-review runs are read-only. All three modes use the same bounded execution contract:
 
-The helper runs Claude Code with safe mode, no MCP configuration, slash commands disabled, Chrome disabled, built-in tools limited to `Read`, `Glob`, `Grep`, and `Bash`, and `dontAsk` permission mode.
+The helper runs Claude Code with safe mode, no MCP configuration, slash commands disabled, Chrome disabled, built-in tools limited by default to `Read`, `Glob`, `Grep`, and `Bash`, and `dontAsk` permission mode.
 
 Do not execute project code or validation commands unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
 Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`. Shell commands must not be used for any other purpose or modify files, the index, refs, configuration, or other repository state.

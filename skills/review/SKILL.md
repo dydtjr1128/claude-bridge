@@ -36,11 +36,13 @@ Once a finding has enough static evidence, report it; if evidence remains insuff
 
 Executable validation, Opus, `--deep`, retries, and fixes each require explicit user intent. Do not infer that intent from risk, difficulty, a failed review, or a review request.
 
+Use Fable 5.1 only when the user explicitly requests Fable.
+
 ## Model Selection
 
 - Use `claude-sonnet-5` by default for an ordinary review.
-- Use `claude-opus-5` only when the user explicitly asks for Opus or `--deep`.
-- Normalize shorthand only after the user selects a model: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus`, `opus5`, `opus-5`, and `opus 5` -> `claude-opus-5`; explicit legacy `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
+- Use `claude-opus-5-5` only when the user explicitly asks for Opus or `--deep`.
+- Normalize shorthand only after the user selects a model: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus` and `opus5.5` -> `claude-opus-5-5`; `fable` and `fable5.1` -> `claude-fable-5-1`; explicit `opus5` and `fable5` remain pinned to version 5; explicit legacy `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
 
 ## Review Prompt
 
