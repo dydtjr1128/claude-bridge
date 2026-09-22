@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -33,13 +34,13 @@ test("default timeout scales with the selected Claude model", async () => {
   assert.equal(bridge.defaultTimeoutForModel("team-fable-reviewer"), "20m0s");
 });
 
-test("current Opus shorthand and deep mode select Claude Opus 5", async () => {
+test("explicit legacy Opus aliases stay pinned while deep selects Opus 5.5", async () => {
   const bridge = await loadBridge();
 
-  for (const model of ["opus", "opus5", "opus-5", "opus 5", "claude-opus-5"]) {
+  for (const model of ["opus5", "opus-5", "opus 5", "claude-opus-5"]) {
     assert.equal(bridge.normalizeModel(model, "review", false), "claude-opus-5", model);
   }
-  assert.equal(bridge.normalizeModel(undefined, "review", true), "claude-opus-5");
+  assert.equal(bridge.normalizeModel(undefined, "review", true), "claude-opus-5-5");
   for (const model of ["opus4.8", "opus 4.8", "claude-opus-4-8", "CLAUDE-OPUS-4-8"]) {
     assert.equal(bridge.normalizeModel(model, "review", false), "claude-opus-4-8", model);
   }
@@ -220,4 +221,93 @@ test("skills limit preflight and verification to explicit, static actions", () =
 test("repository declares Apache-2.0 licensing", () => {
   assert.ok(existsSync(path.join(ROOT_DIR, "LICENSE")));
   assert.match(readFileSync(path.join(ROOT_DIR, "LICENSE"), "utf8"), /Apache License[\s\S]*Version 2\.0/);
+});
+
+
+test("current aliases select Opus 5.5 and Fable 5.1 without changing legacy or custom IDs", async () => {
+  const bridge = await loadBridge();
+  for (const value of ["opus", "claude-opus", "opus5.5", "opus-5.5", "opus 5.5", "opus-5-5", "claude-opus-5-5", " OPUS5.5 "]) {
+    assert.equal(bridge.normalizeModel(value, "review", false), "claude-opus-5-5", value);
+  }
+  for (const value of ["fable", "claude-fable", "fable5.1", "fable-5.1", "fable 5.1", "fable-5-1", "claude-fable-5-1", " FABLE5.1 "]) {
+    assert.equal(bridge.normalizeModel(value, "rescue", false), "claude-fable-5-1", value);
+  }
+  for (const [value, expected] of [["opus5.0", "claude-opus-5"], ["fable5", "claude-fable-5"], ["fable5.0", "claude-fable-5"], ["claude-fable-5", "claude-fable-5"], ["team-Fable-reviewer", "team-Fable-reviewer"], ["opus9", "opus9"]]) {
+    assert.equal(bridge.normalizeModel(value, "review", false), expected);
+  }
+  assert.equal(bridge.defaultTimeoutForModel(bridge.normalizeModel("opus", "review", false)), "15m0s");
+  assert.equal(bridge.defaultTimeoutForModel(bridge.normalizeModel("fable", "review", false)), "20m0s");
+});
+
+test("CLI rejects unknown and conflicting flags and limits edit opt-in to rescue", async () => {
+  const bridge = await loadBridge();
+  assert.throws(() => bridge.parseArgs(["--timout", "1s"]), /Unknown option/);
+  assert.throws(() => bridge.validateCommandOptions("review", { model: "opus", deep: true }), /either/);
+  for (const command of ["review", "adversarial-review", "setup"]) {
+    assert.throws(() => bridge.validateCommandOptions(command, { "allow-edits": true }), /only valid|not valid/);
+  }
+  bridge.validateCommandOptions("rescue", { "allow-edits": true });
+  assert.throws(() => bridge.validateCommandOptions("setup", { model: "opus" }), /not valid/);
+  assert.throws(() => bridge.validateCommandOptions("setup", {}, ["unexpected"]), /positional/);
+  assert.deepEqual(bridge.parseArgs(["--", "--literal"]), { options: {}, positionals: ["--literal"] });
+  const normal = bridge.buildClaudeArgs("investigate");
+  assert.equal(normal[normal.indexOf("--tools") + 1], "Read,Glob,Grep,Bash");
+  assert.equal(normal.includes("--allowedTools"), false);
+  const edit = bridge.buildClaudeArgs("fix", { allowEdits: true });
+  assert.equal(edit[edit.indexOf("--tools") + 1], "Read,Glob,Grep,Bash,Edit,Write");
+  assert.equal(edit[edit.indexOf("--allowedTools") + 1], "Edit,Write");
+  assert.equal(edit[edit.indexOf("--permission-mode") + 1], "dontAsk");
+});
+
+test("setup gives version and smoke one shared deadline", async () => {
+  const bridge = await loadBridge();
+  let time = 1000;
+  const budgets = [];
+  const result = bridge.runSetupCheck({ timeout: "100ms" }, {
+    now: () => time,
+    run: (_command, args, options) => {
+      budgets.push(options.timeoutMs);
+      time += 30;
+      return { status: 0, stdout: args[0] === "--version" ? "version" : "OK", stderr: "" };
+    }
+  });
+  assert.equal(result.ready, true);
+  assert.deepEqual(budgets, [100, 70]);
+});
+
+test("setup skips smoke after failed version or exhausted budget", async () => {
+  const bridge = await loadBridge();
+  for (const mode of ["failure", "deadline", "spawn-error"]) {
+    let time = 1000;
+    let calls = 0;
+    const result = bridge.runSetupCheck({ timeout: "100ms" }, {
+      now: () => time,
+      run: () => {
+        calls += 1;
+        if (mode === "deadline") time += 100;
+        return { status: mode === "failure" ? 1 : 0, stdout: "", stderr: "", error: mode === "spawn-error" ? new Error("missing") : undefined };
+      }
+    });
+    assert.equal(result.ready, false, mode);
+    assert.equal(result.smoke.skipped, true, mode);
+    assert.equal(calls, 1, mode);
+  }
+});
+
+
+test("rescue CLI renders edit policy only for explicit opt-in", () => {
+  for (const allowEdits of [false, true]) {
+    const args = [BRIDGE_SCRIPT, "rescue", "--dry-run", "--json", "--model", "fable"];
+    if (allowEdits) args.push("--allow-edits");
+    const result = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 10000 });
+    assert.equal(result.status, 0, result.stderr);
+    const payload = JSON.parse(result.stdout);
+    assert.equal(payload.model, "claude-fable-5-1");
+    assert.equal(payload.timeout, "20m0s");
+    assert.doesNotMatch(payload.prompt, /\{\{[A-Z_]+\}\}/);
+    assert.match(payload.prompt, allowEdits ? /Use Edit and Write only within/ : /Do not edit files\. This run is investigation/);
+  }
+  const denied = spawnSync(process.execPath, [BRIDGE_SCRIPT, "review", "--dry-run", "--allow-edits"], { encoding: "utf8", timeout: 10000 });
+  assert.equal(denied.status, 1);
+  assert.match(denied.stderr, /only valid for rescue/);
 });

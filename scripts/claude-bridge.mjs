@@ -9,34 +9,16 @@ import { fileURLToPath } from "node:url";
 const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PROMPT_DIR = path.join(ROOT_DIR, "prompts");
 const VALID_COMMANDS = new Set(["setup", "review", "adversarial-review", "rescue"]);
+const BOOLEAN_OPTIONS = new Set(["json", "dry-run", "deep", "help", "allow-edits"]);
+const VALUE_OPTIONS = new Set(["cwd", "output-dir", "timeout", "language", "scope", "model"]);
+const SETUP_OPTIONS = new Set(["cwd", "timeout", "json", "help"]);
 export const CLAUDE_DEFAULT_TIMEOUT = "10m0s";
 export const CLAUDE_SLOW_MODEL_TIMEOUT = "15m0s";
 export const CLAUDE_FABLE_TIMEOUT = "20m0s";
+export const CLAUDE_SETUP_TIMEOUT = "2m0s";
 export const CLAUDE_REVIEW_TOOLS = "Read,Glob,Grep,Bash";
+export const CLAUDE_EDIT_TOOLS = `${CLAUDE_REVIEW_TOOLS},Edit,Write`;
 export const DEFAULT_REVIEW_SCOPE = "all current uncommitted changes in this repository, including staged, unstaged, and untracked files";
-
-export function buildClaudeArgs(prompt, options = {}) {
-  const args = [
-    "--safe-mode",
-    "--strict-mcp-config",
-    "--disable-slash-commands",
-    "--no-chrome",
-    "--tools",
-    CLAUDE_REVIEW_TOOLS,
-    "--permission-mode",
-    "dontAsk",
-    "-p",
-    prompt
-  ];
-  if (options.model) {
-    args.push("--model", options.model);
-  }
-  if (options.outputFormat) {
-    args.push("--output-format", options.outputFormat);
-  }
-  args.push("--no-session-persistence");
-  return args;
-}
 
 export function defaultTimeoutForModel(model) {
   const normalized = String(model);
@@ -49,37 +31,71 @@ export function defaultTimeoutForModel(model) {
   return CLAUDE_DEFAULT_TIMEOUT;
 }
 
+export function buildClaudeArgs(prompt, options = {}) {
+  const args = [
+    "--safe-mode",
+    "--strict-mcp-config",
+    "--disable-slash-commands",
+    "--no-chrome",
+    "--tools",
+    options.allowEdits ? CLAUDE_EDIT_TOOLS : CLAUDE_REVIEW_TOOLS,
+    "--permission-mode",
+    "dontAsk",
+    "-p",
+    prompt
+  ];
+  if (options.allowEdits) {
+    args.push("--allowedTools", "Edit,Write");
+  }
+  if (options.model) {
+    args.push("--model", options.model);
+  }
+  if (options.outputFormat) {
+    args.push("--output-format", options.outputFormat);
+  }
+  args.push("--no-session-persistence");
+  return args;
+}
+
 function usage() {
   console.log([
     "Usage:",
-    "  node scripts/claude-bridge.mjs setup [--json]",
-    "  node scripts/claude-bridge.mjs review [--model <model>] [--timeout <duration>] [--language <lang>] [--scope <text>] [focus ...]",
+    "  node scripts/claude-bridge.mjs setup [--timeout <duration>] [--json]",
+    "  node scripts/claude-bridge.mjs review [--model <model>|--deep] [--timeout <duration>] [--language <lang>] [--scope <text>] [focus ...]",
     "  node scripts/claude-bridge.mjs adversarial-review [--model <model>|--deep] [--timeout <duration>] [--language <lang>] [--scope <text>] [focus ...]",
     "  node scripts/claude-bridge.mjs rescue [--model <model>|--deep] [--timeout <duration>] [--language <lang>] [--scope <text>] [request ...]",
     "",
     "Options:",
     "  --cwd <path>          Run from this repository path.",
     "  --output-dir <path>   Store Claude JSON, log, prompt, and markdown output here.",
-    `  --timeout <duration>  Stop a review after this duration (default: ${CLAUDE_DEFAULT_TIMEOUT}; Opus: ${CLAUDE_SLOW_MODEL_TIMEOUT}; Fable: ${CLAUDE_FABLE_TIMEOUT}).`,
+    `  --timeout <duration>  Stop setup after ${CLAUDE_SETUP_TIMEOUT}, or a review after ${CLAUDE_DEFAULT_TIMEOUT} (Opus: ${CLAUDE_SLOW_MODEL_TIMEOUT}; Fable: ${CLAUDE_FABLE_TIMEOUT}).`,
     "  --dry-run             Print the generated prompt without calling Claude.",
     "  --json                Print machine-readable wrapper output.",
-    "  --deep                Select claude-opus-5 when explicitly requested."
+    "  --deep                Select claude-opus-5-5 when explicitly requested.",
+    "  --allow-edits         Enable Edit and Write for an explicitly requested rescue fix."
   ].join("\n"));
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {};
   const positionals = [];
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
+    if (value === "--") {
+      positionals.push(...argv.slice(index + 1));
+      break;
+    }
     if (!value.startsWith("--")) {
       positionals.push(value);
       continue;
     }
     const key = value.slice(2);
-    if (["json", "dry-run", "deep"].includes(key)) {
+    if (BOOLEAN_OPTIONS.has(key)) {
       options[key] = true;
       continue;
+    }
+    if (!VALUE_OPTIONS.has(key)) {
+      throw new Error(`Unknown option: --${key}`);
     }
     const next = argv[index + 1];
     if (next == null || next.startsWith("--")) {
@@ -89,6 +105,26 @@ function parseArgs(argv) {
     index += 1;
   }
   return { options, positionals };
+}
+
+export function validateCommandOptions(command, options, positionals = []) {
+  if (command === "setup") {
+    for (const key of Object.keys(options)) {
+      if (!SETUP_OPTIONS.has(key)) {
+        throw new Error(`Option --${key} is not valid for setup.`);
+      }
+    }
+    if (positionals.length > 0) {
+      throw new Error("Setup does not accept positional arguments.");
+    }
+    return;
+  }
+  if (options["allow-edits"] && command !== "rescue") {
+    throw new Error("--allow-edits is only valid for rescue.");
+  }
+  if (options.deep && options.model) {
+    throw new Error("Use either --deep or --model, not both.");
+  }
 }
 
 export function parseDuration(value) {
@@ -110,41 +146,24 @@ export function parseDuration(value) {
 }
 
 export function normalizeModel(model, _command, deep) {
-  if (model) {
-    const normalized = String(model).trim().toLowerCase();
-    if (
-      normalized === "sonnet" ||
-      normalized === "sonnet5" ||
-      normalized === "sonnet-5" ||
-      normalized === "sonnet 5"
-    ) {
-      return "claude-sonnet-5";
-    }
-    if (
-      normalized === "opus" ||
-      normalized === "opus5" ||
-      normalized === "opus-5" ||
-      normalized === "opus 5" ||
-      normalized === "claude-opus-5"
-    ) {
-      return "claude-opus-5";
-    }
-    if (
-      normalized === "opus4.8" ||
-      normalized === "opus-4.8" ||
-      normalized === "opus-4-8" ||
-      normalized === "opus 4.8" ||
-      normalized === "opsu4.8" ||
-      normalized === "claude-opus-4-8"
-    ) {
-      return "claude-opus-4-8";
-    }
-    return model;
+  if (!model) {
+    return deep ? "claude-opus-5-5" : "claude-sonnet-5";
   }
-  if (deep) {
-    return "claude-opus-5";
+  const normalized = String(model).trim().toLowerCase();
+  if (normalized === "opus" || normalized === "claude-opus") return "claude-opus-5-5";
+  if (normalized === "fable" || normalized === "claude-fable") return "claude-fable-5-1";
+  if (normalized === "sonnet") return "claude-sonnet-5";
+  if (normalized === "opsu4.8") return "claude-opus-4-8";
+  // Only normalize known, explicitly versioned aliases. Preserve custom model IDs.
+  const match = /^(?:claude-)?(opus|fable|sonnet)[ -]?(\d+(?:[. -]\d+)?)$/.exec(normalized);
+  if (match) {
+    const version = match[2].replace(/[. ]/g, "-");
+    const known = { opus: ["5-5", "5", "5-0", "4-8"], fable: ["5-1", "5", "5-0"], sonnet: ["5"] };
+    if (known[match[1]].includes(version)) {
+      return `claude-${match[1]}-${version === "5-0" ? "5" : version}`;
+    }
   }
-  return "claude-sonnet-5";
+  return model;
 }
 
 function timestamp() {
@@ -251,23 +270,36 @@ function printOutput(payload, asJson) {
   }
 }
 
-function handleSetup(options) {
+export function runSetupCheck(options = {}, dependencies = {}) {
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const version = run("claude", ["--version"], { cwd });
-  const smoke = run("claude", buildClaudeArgs("Respond with exactly: OK", {
-    model: "claude-sonnet-5"
-  }), { cwd });
+  const timeout = String(options.timeout ?? CLAUDE_SETUP_TIMEOUT).trim();
+  const timeoutMs = parseDuration(timeout);
+  const now = dependencies.now ?? Date.now;
+  const execute = dependencies.run ?? run;
+  const deadline = now() + timeoutMs;
+  const version = execute("claude", ["--version"], { cwd, timeoutMs });
+  const remainingMs = deadline - now();
   const versionReport = commandReport(version);
-  const smokeReport = commandReport(smoke);
-  const payload = {
-    ready: version.status === 0 && smoke.status === 0 && outputText(smoke.stdout).trim() === "OK",
-    version: versionReport,
-    smoke: smokeReport
-  };
-  printOutput({ ...payload, result: payload.ready ? "Claude Bridge setup check passed." : "Claude Bridge setup check failed." }, Boolean(options.json));
-  if (!payload.ready) {
-    process.exitCode = 1;
+  if (version.status !== 0 || version.error || remainingMs <= 0) {
+    return { ready: false, timeout, version: versionReport, smoke: {
+      skipped: true, reason: remainingMs <= 0 ? "Setup deadline exhausted." : "Version probe failed."
+    } };
   }
+  const smoke = execute("claude", buildClaudeArgs("Respond with exactly: OK", {
+    model: "claude-sonnet-5"
+  }), { cwd, timeoutMs: remainingMs });
+  return {
+    ready: !smoke.error && smoke.status === 0 && now() <= deadline && outputText(smoke.stdout).trim() === "OK",
+    timeout,
+    version: versionReport,
+    smoke: commandReport(smoke)
+  };
+}
+
+function handleSetup(options) {
+  const payload = runSetupCheck(options);
+  printOutput({ ...payload, result: payload.ready ? "Claude Bridge setup check passed." : "Claude Bridge setup check failed." }, Boolean(options.json));
+  if (!payload.ready) process.exitCode = 1;
 }
 
 function handleClaudeCommand(command, options, positionals) {
@@ -287,7 +319,10 @@ function handleClaudeCommand(command, options, positionals) {
     SCOPE: scope,
     USER_FOCUS: userFocus,
     LANGUAGE: language,
-    TIMEOUT: timeout
+    TIMEOUT: timeout,
+    EDIT_POLICY: options["allow-edits"]
+      ? "The user explicitly authorized a constrained fix. Use Edit and Write only within the requested scope. Do not modify files through shell commands."
+      : "Do not edit files. This run is investigation and fix planning only; an explicitly authorized rescue fix requires --allow-edits."
   });
   const promptFile = path.join(outputDir, `${command}.prompt.md`);
   const jsonFile = path.join(outputDir, `${command}.json`);
@@ -311,7 +346,8 @@ function handleClaudeCommand(command, options, positionals) {
 
   const claude = run("claude", buildClaudeArgs(prompt, {
     model,
-    outputFormat: "json"
+    outputFormat: "json",
+    allowEdits: Boolean(options["allow-edits"])
   }), { cwd, timeoutMs });
   fs.writeFileSync(jsonFile, claude.stdout ?? "", "utf8");
   const spawnError = claude.error instanceof Error ? claude.error.message : "";
@@ -362,6 +398,11 @@ function main() {
     throw new Error(`Unknown command: ${command}`);
   }
   const { options, positionals } = parseArgs(argv);
+  if (options.help) {
+    usage();
+    return;
+  }
+  validateCommandOptions(command, options, positionals);
   if (command === "setup") {
     handleSetup(options);
     return;
