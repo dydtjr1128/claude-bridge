@@ -27,7 +27,7 @@ Do not execute project code or validation commands unless the user explicitly an
 Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`.
 When the scope is current uncommitted work, include staged, unstaged, and untracked files; enumerate them with read-only Git inspection before reviewing only those changes.
 Do not use shell commands for any other purpose, and do not run commands that modify files, the index, refs, configuration, or other repository state.
-Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
+Complete one bounded pass within the helper-selected timeout, including any explicit `--timeout` override.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
@@ -40,9 +40,9 @@ Use Fable 5.1 only when the user explicitly requests Fable.
 
 ## Model Selection
 
-- Use `claude-sonnet-5` by default for an ordinary review.
+- Use `claude-sonnet-5-5` by default for an ordinary review.
 - Use `claude-opus-5-5` only when the user explicitly asks for Opus or `--deep`.
-- Normalize shorthand only after the user selects a model: `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus` and `opus5.5` -> `claude-opus-5-5`; `fable` and `fable5.1` -> `claude-fable-5-1`; explicit `opus5` and `fable5` remain pinned to version 5; explicit legacy `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
+- Normalize shorthand only after the user selects a model: `sonnet` and `sonnet5.5` -> `claude-sonnet-5-5`; explicit `sonnet5` and `sonnet-5` -> `claude-sonnet-5`; `opus` and `opus5.5` -> `claude-opus-5-5`; `fable` and `fable5.1` -> `claude-fable-5-1`; explicit `opus5` and `fable5` remain pinned to version 5; explicit legacy `opus4.8`, `opus 4.8`, and clear `opsu4.8` typos -> `claude-opus-4-8`.
 
 ## Review Prompt
 
@@ -55,7 +55,7 @@ Do not edit files.
 Do not execute project code or validation commands unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
 Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`.
 Do not use shell commands for any other purpose, and do not run commands that modify files, the index, refs, configuration, or other repository state.
-Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
+Complete one bounded pass within the helper-selected timeout, including any explicit `--timeout` override.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 Start with the exact diff or named files in scope and inspect only directly relevant dependencies needed to support a concrete finding.
@@ -79,9 +79,9 @@ If using this skill from its installed plugin cache, resolve the helper relative
 
 Useful options:
 
-- `--model claude-sonnet-5` for the default ordinary review model.
+- `--model claude-sonnet-5-5` for the default ordinary review model.
 - `--deep` only when the user explicitly requests a deeper Opus pass.
-- `--timeout <duration>` to override the hard limit; the default is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`.
+- `--timeout <duration>` to override the hard limit; the default is `15m0s`, `45m0s` for model names containing `opus`, or `60m0s` for model names containing `fable`.
 - `--scope "<scope>"` to preserve the user's exact target.
 
 The helper stores prompt, JSON, markdown, and logs under `.codex/claude-bridge/`.
