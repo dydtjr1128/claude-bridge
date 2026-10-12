@@ -12,9 +12,9 @@ const VALID_COMMANDS = new Set(["setup", "review", "adversarial-review", "rescue
 const BOOLEAN_OPTIONS = new Set(["json", "dry-run", "deep", "help", "allow-edits"]);
 const VALUE_OPTIONS = new Set(["cwd", "output-dir", "timeout", "language", "scope", "model"]);
 const SETUP_OPTIONS = new Set(["cwd", "timeout", "json", "help"]);
-export const CLAUDE_DEFAULT_TIMEOUT = "10m0s";
-export const CLAUDE_SLOW_MODEL_TIMEOUT = "15m0s";
-export const CLAUDE_FABLE_TIMEOUT = "20m0s";
+export const CLAUDE_DEFAULT_TIMEOUT = "15m0s";
+export const CLAUDE_SLOW_MODEL_TIMEOUT = "45m0s";
+export const CLAUDE_FABLE_TIMEOUT = "60m0s";
 export const CLAUDE_SETUP_TIMEOUT = "2m0s";
 export const CLAUDE_REVIEW_TOOLS = "Read,Glob,Grep,Bash";
 export const CLAUDE_EDIT_TOOLS = `${CLAUDE_REVIEW_TOOLS},Edit,Write`;
@@ -147,18 +147,18 @@ export function parseDuration(value) {
 
 export function normalizeModel(model, _command, deep) {
   if (!model) {
-    return deep ? "claude-opus-5-5" : "claude-sonnet-5";
+    return deep ? "claude-opus-5-5" : "claude-sonnet-5-5";
   }
   const normalized = String(model).trim().toLowerCase();
   if (normalized === "opus" || normalized === "claude-opus") return "claude-opus-5-5";
   if (normalized === "fable" || normalized === "claude-fable") return "claude-fable-5-1";
-  if (normalized === "sonnet") return "claude-sonnet-5";
+  if (normalized === "sonnet" || normalized === "claude-sonnet") return "claude-sonnet-5-5";
   if (normalized === "opsu4.8") return "claude-opus-4-8";
   // Only normalize known, explicitly versioned aliases. Preserve custom model IDs.
   const match = /^(?:claude-)?(opus|fable|sonnet)[ -]?(\d+(?:[. -]\d+)?)$/.exec(normalized);
   if (match) {
     const version = match[2].replace(/[. ]/g, "-");
-    const known = { opus: ["5-5", "5", "5-0", "4-8"], fable: ["5-1", "5", "5-0"], sonnet: ["5"] };
+    const known = { opus: ["5-5", "5", "5-0", "4-8"], fable: ["5-1", "5", "5-0"], sonnet: ["5-5", "5", "5-0"] };
     if (known[match[1]].includes(version)) {
       return `claude-${match[1]}-${version === "5-0" ? "5" : version}`;
     }
@@ -286,7 +286,7 @@ export function runSetupCheck(options = {}, dependencies = {}) {
     } };
   }
   const smoke = execute("claude", buildClaudeArgs("Respond with exactly: OK", {
-    model: "claude-sonnet-5"
+    model: "claude-sonnet-5-5"
   }), { cwd, timeoutMs: remainingMs });
   return {
     ready: !smoke.error && smoke.status === 0 && now() <= deadline && outputText(smoke.stdout).trim() === "OK",

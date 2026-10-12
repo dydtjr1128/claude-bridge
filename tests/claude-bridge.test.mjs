@@ -19,6 +19,9 @@ test("parseDuration accepts bounded duration syntax and rejects invalid values",
   assert.equal(bridge.parseDuration("2s"), 2_000);
   assert.equal(bridge.parseDuration("3m"), 180_000);
   assert.equal(bridge.parseDuration("5m0s"), 300_000);
+  assert.equal(bridge.parseDuration("30m0s"), 1_800_000);
+  assert.equal(bridge.parseDuration("45m0s"), 2_700_000);
+  assert.equal(bridge.parseDuration("60m0s"), 3_600_000);
 
   for (const value of ["0ms", "-1s", "1", "5mwat", "1s1s", "1s1m", "", "  "]) {
     assert.throws(() => bridge.parseDuration(value), /duration|timeout/i);
@@ -28,10 +31,10 @@ test("parseDuration accepts bounded duration syntax and rejects invalid values",
 test("default timeout scales with the selected Claude model", async () => {
   const bridge = await loadBridge();
 
-  assert.equal(bridge.defaultTimeoutForModel("claude-sonnet-5"), "10m0s");
-  assert.equal(bridge.defaultTimeoutForModel("claude-opus-5"), "15m0s");
-  assert.equal(bridge.defaultTimeoutForModel("claude-opus-4-8"), "15m0s");
-  assert.equal(bridge.defaultTimeoutForModel("team-fable-reviewer"), "20m0s");
+  assert.equal(bridge.defaultTimeoutForModel("claude-sonnet-5-5"), "15m0s");
+  assert.equal(bridge.defaultTimeoutForModel("claude-opus-5"), "45m0s");
+  assert.equal(bridge.defaultTimeoutForModel("claude-opus-4-8"), "45m0s");
+  assert.equal(bridge.defaultTimeoutForModel("team-fable-reviewer"), "60m0s");
 });
 
 test("explicit legacy Opus aliases stay pinned while deep selects Opus 5.5", async () => {
@@ -46,11 +49,11 @@ test("explicit legacy Opus aliases stay pinned while deep selects Opus 5.5", asy
   }
 });
 
-test("review commands default to Claude Sonnet 5 without explicit deep mode", async () => {
+test("review commands default to Claude Sonnet 5.5 without explicit deep mode", async () => {
   const bridge = await loadBridge();
 
-  assert.equal(bridge.normalizeModel(undefined, "review", false), "claude-sonnet-5");
-  assert.equal(bridge.normalizeModel(undefined, "adversarial-review", false), "claude-sonnet-5");
+  assert.equal(bridge.normalizeModel(undefined, "review", false), "claude-sonnet-5-5");
+  assert.equal(bridge.normalizeModel(undefined, "adversarial-review", false), "claude-sonnet-5-5");
 });
 
 test("default review scope covers all uncommitted work", async () => {
@@ -148,7 +151,7 @@ test("Claude reviews use isolated read-only-oriented arguments", async () => {
 
   assert.equal(bridge.CLAUDE_REVIEW_TOOLS, "Read,Glob,Grep,Bash");
   assert.deepEqual(bridge.buildClaudeArgs("review this diff", {
-    model: "claude-sonnet-5",
+    model: "claude-sonnet-5-5",
     outputFormat: "json"
   }), [
     "--safe-mode",
@@ -162,7 +165,7 @@ test("Claude reviews use isolated read-only-oriented arguments", async () => {
     "-p",
     "review this diff",
     "--model",
-    "claude-sonnet-5",
+    "claude-sonnet-5-5",
     "--output-format",
     "json",
     "--no-session-persistence"
@@ -203,7 +206,7 @@ test("skills limit preflight and verification to explicit, static actions", () =
       assert.match(text, exactSentence(sentence));
     }
     assert.match(text, /helper-selected timeout/i);
-    assert.match(text, /ten minutes[\s\S]*fifteen minutes[\s\S]*twenty minutes/i);
+    assert.match(text, /including any explicit `--timeout` override/);
     assert.match(text, /static file and line inspection/i);
     assert.match(text, /setup/i);
     assert.doesNotMatch(text, /claude -p "Respond with exactly: OK"/);
@@ -212,9 +215,9 @@ test("skills limit preflight and verification to explicit, static actions", () =
 
   const readme = readFileSync(path.join(ROOT_DIR, "README.md"), "utf8");
   assert.match(readme, /--timeout <duration>/);
-  assert.match(readme, /10m0s/);
   assert.match(readme, /15m0s/);
-  assert.match(readme, /20m0s/);
+  assert.match(readme, /45m0s/);
+  assert.match(readme, /60m0s/);
   assert.match(readme, /explicit user intent/i);
 });
 
@@ -235,8 +238,8 @@ test("current aliases select Opus 5.5 and Fable 5.1 without changing legacy or c
   for (const [value, expected] of [["opus5.0", "claude-opus-5"], ["fable5", "claude-fable-5"], ["fable5.0", "claude-fable-5"], ["claude-fable-5", "claude-fable-5"], ["team-Fable-reviewer", "team-Fable-reviewer"], ["opus9", "opus9"]]) {
     assert.equal(bridge.normalizeModel(value, "review", false), expected);
   }
-  assert.equal(bridge.defaultTimeoutForModel(bridge.normalizeModel("opus", "review", false)), "15m0s");
-  assert.equal(bridge.defaultTimeoutForModel(bridge.normalizeModel("fable", "review", false)), "20m0s");
+  assert.equal(bridge.defaultTimeoutForModel(bridge.normalizeModel("opus", "review", false)), "45m0s");
+  assert.equal(bridge.defaultTimeoutForModel(bridge.normalizeModel("fable", "review", false)), "60m0s");
 });
 
 test("CLI rejects unknown and conflicting flags and limits edit opt-in to rescue", async () => {
@@ -303,11 +306,41 @@ test("rescue CLI renders edit policy only for explicit opt-in", () => {
     assert.equal(result.status, 0, result.stderr);
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.model, "claude-fable-5-1");
-    assert.equal(payload.timeout, "20m0s");
+    assert.equal(payload.timeout, "60m0s");
     assert.doesNotMatch(payload.prompt, /\{\{[A-Z_]+\}\}/);
     assert.match(payload.prompt, allowEdits ? /Use Edit and Write only within/ : /Do not edit files\. This run is investigation/);
   }
   const denied = spawnSync(process.execPath, [BRIDGE_SCRIPT, "review", "--dry-run", "--allow-edits"], { encoding: "utf8", timeout: 10000 });
   assert.equal(denied.status, 1);
   assert.match(denied.stderr, /only valid for rescue/);
+});
+
+
+test("Sonnet 5.5 aliases do not change explicitly pinned Sonnet 5 requests", async () => {
+  const bridge = await loadBridge();
+  for (const value of ["sonnet", "claude-sonnet", "sonnet5.5", "sonnet-5.5", "sonnet 5.5", "sonnet-5-5", "claude-sonnet-5-5", " SONNET5.5 "]) {
+    assert.equal(bridge.normalizeModel(value, "review", false), "claude-sonnet-5-5", value);
+  }
+  for (const value of ["sonnet5", "sonnet-5", "sonnet 5", "sonnet5.0", "claude-sonnet-5"]) {
+    assert.equal(bridge.normalizeModel(value, "review", false), "claude-sonnet-5", value);
+  }
+});
+
+test("selected Claude defaults and shorter or longer overrides reach every mode prompt", () => {
+  for (const [command, model, defaultTimeout] of [
+    ["review", "sonnet", "15m0s"],
+    ["adversarial-review", "opus", "45m0s"],
+    ["rescue", "fable", "60m0s"],
+  ]) {
+    for (const timeout of [undefined, "7m30s", "90m0s"]) {
+      const args = [BRIDGE_SCRIPT, command, "--dry-run", "--json", "--model", model];
+      if (timeout) args.push("--timeout", timeout);
+      const result = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 10000 });
+      assert.equal(result.status, 0, result.stderr);
+      const payload = JSON.parse(result.stdout);
+      assert.equal(payload.timeout, timeout ?? defaultTimeout);
+      assert.ok(payload.prompt.includes(`selected hard timeout (${timeout ?? defaultTimeout})`));
+      assert.doesNotMatch(payload.prompt, /\{\{TIMEOUT\}\}/);
+    }
+  }
 });

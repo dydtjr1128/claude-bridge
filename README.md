@@ -116,7 +116,7 @@ node .\scripts\claude-bridge.mjs adversarial-review --scope "all current uncommi
 node .\scripts\claude-bridge.mjs rescue --scope "the failing parser test"
 ```
 
-The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent. Review-oriented commands accept `--timeout <duration>` using `ms`, `s`, `m`, or combined values such as `10m0s`. The default hard timeout is `10m0s`, `15m0s` for model names containing `opus`, or `20m0s` for model names containing `fable`.
+The skills prefer this helper because it normalizes model names, stores prompts/logs/results, and keeps the reviewer prompt consistent. Review-oriented commands accept `--timeout <duration>` using `ms`, `s`, `m`, or combined values such as `15m0s`. The default hard timeout is `15m0s`, `45m0s` for model names containing `opus`, or `60m0s` for model names containing `fable`.
 
 ### `$review`
 
@@ -127,7 +127,7 @@ Use it when you want:
 - a second-pass review of local changes;
 - a sanity check before shipping;
 - another model's view on Codex review findings;
-- a mostly routine review where Sonnet 5 is sufficient.
+- a mostly routine review where Sonnet 5.5 is sufficient.
 
 Example prompts:
 
@@ -158,7 +158,7 @@ Use $adversarial-review to look for race conditions and rollback risks.
 Use $adversarial-review with Opus if this change is high risk.
 ```
 
-The default guidance uses Sonnet 5. Opus 5 and `--deep` require explicit user intent; risk or complexity alone does not select them.
+The default guidance uses Sonnet 5.5. Opus 5.5 and `--deep` require explicit user intent; risk or complexity alone does not select them.
 
 ### `$rescue`
 
@@ -181,20 +181,22 @@ Use $rescue to ask Claude to try a constrained fix for the failing parser test.
 
 If you do not explicitly ask for a fix, `$rescue` should keep Claude in investigation and planning mode.
 
+To allow more time for one review, use `node .\scripts\claude-bridge.mjs review --model sonnet --timeout 90m0s`. This duration reaches both the process hard limit and the provider prompt. It changes the time budget for one attempt, without authorizing retries or additional execution.
+
 ## Model Selection
 
 Claude Bridge normalizes common shorthand before calling Claude CLI:
 
-- `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
+- `sonnet` or `sonnet5.5` -> `claude-sonnet-5-5`; explicit `sonnet5` or `sonnet-5` -> `claude-sonnet-5`
 - `opus` or `opus5.5` -> `claude-opus-5-5`; `fable` or `fable5.1` -> `claude-fable-5-1`
 - Explicit `opus5` / `claude-opus-5` and `fable5` / `claude-fable-5` remain pinned to version 5
 - `opus4.8`, `opus-4-8`, or `opus 4.8` -> `claude-opus-4-8`
 
-Canonical IDs follow the [Anthropic model reference](https://platform.claude.com/docs/en/models/overview). Fable is selected only when explicitly requested; `--deep` selects Opus 5.5. Unknown model IDs pass through unchanged. Opus keeps a 15-minute timeout and Fable keeps a 20-minute timeout.
+Canonical IDs follow the [Anthropic model reference](https://platform.claude.com/docs/en/models/overview). Fable is selected only when explicitly requested; `--deep` selects Opus 5.5. Unknown model IDs pass through unchanged. Standard models use a 15-minute timeout, Opus uses 45 minutes, and Fable uses 60 minutes. An explicit `--timeout` replaces the default and can be shorter or longer.
 
 Default model policy:
 
-- Use `claude-sonnet-5` for the default review, challenge pass, investigation, and fix planning.
+- Use `claude-sonnet-5-5` for the default review, challenge pass, investigation, and fix planning.
 - Use `claude-opus-5-5` or `--deep` only when the user explicitly requests Opus.
 - Do not add reviewers, retry, or switch models automatically after a failed or incomplete pass.
 
@@ -212,7 +214,7 @@ The helper runs Claude Code with safe mode, no MCP configuration, slash commands
 
 Do not execute project code or validation commands unless the user explicitly and directly requests that execution. This includes tests, builds, package managers, scripts, servers, applications, CI, deployment, release, and workflow automation. A review or investigation request alone is not permission to execute them.
 Read-only repository inspection commands required to obtain the requested scope are allowed, including `git diff`, `git status`, `git show`, `git log`, `git blame`, and `git ls-files`. Shell commands must not be used for any other purpose or modify files, the index, refs, configuration, or other repository state.
-Complete one bounded pass within the helper-selected timeout: ten minutes for standard models, fifteen minutes for model names containing `opus`, and twenty minutes for model names containing `fable`.
+Complete one bounded pass within the helper-selected timeout, including any explicit `--timeout` override.
 Do not retry, add reviewers, expand the scope, or switch to a deeper model automatically.
 If the available time or evidence is insufficient, return the supported findings and state the remaining gap.
 
